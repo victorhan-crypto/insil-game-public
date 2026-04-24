@@ -235,19 +235,23 @@ function loadChapter(code) {
     img.alt = currentChapter.title;
 
     var readingStarted = false;
-    var startReading = function() {
+    var startReading = function(e) {
       if (readingStarted) return;
       readingStarted = true;
+      if (e) { e.stopPropagation(); e.preventDefault(); }
       imgDiv.removeEventListener('click', startReading);
       document.removeEventListener('keydown', spaceStart);
       narrativeText.removeEventListener('click', startReading);
       narrativeText.innerHTML = '';
       appendText(currentChapter.title, 'chapter-title');
       appendText('\u2500\u2500\u2500', 'divider');
-      startPageMode(currentChapter.opening, function() {
-        appendText('\u2500\u2500\u2500', 'divider');
-        showIntervention();
-      });
+      // 짧은 딜레이로 첫 페이지 넘김 방지
+      setTimeout(function() {
+        startPageMode(currentChapter.opening, function() {
+          appendText('\u2500\u2500\u2500', 'divider');
+          showIntervention();
+        });
+      }, 300);
     };
 
     img.onerror = function() { startReading(); };
