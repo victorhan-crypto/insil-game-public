@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>인생은 실전이야</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 시작 화면 -->
+    <div id="start-screen">
+      <div class="cover-image">
+        <img src="cover.jpg" alt="인생은 실전이야" id="cover-img">
+      </div>
+      <div class="api-setup">
+        <label>Gemini API Key</label>
+        <input type="password" id="gemini-key" placeholder="AIza...">
+        <p class="hint">Google AI Studio에서 발급받은 키를 입력하세요.</p>
+        <button id="start-btn">게임 시작</button>
+      </div>
+    </div>
+
+    <!-- 게임 화면 -->
+    <div id="game-screen" style="display:none;">
+      <div id="status-bar">
+        <div class="status-item">
+          <span class="label">연도</span>
+          <span id="s-year">1997</span>
+        </div>
+        <div class="status-item">
+          <span class="label">나이</span>
+          <span id="s-age">18</span>
+        </div>
+        <div class="status-item">
+          <span class="label">자산</span>
+          <span id="s-cash">200만원</span>
+        </div>
+        <div class="status-item">
+          <span class="label">챕터</span>
+          <span id="s-chapter">1편</span>
+        </div>
+      </div>
+
+      <div id="narrative-area">
+        <div id="narrative-text"></div>
+        <div id="loading" style="display:none;">
+          <span class="dot-pulse"></span>
+        </div>
+      </div>
+
+      <div id="input-area">
+        <textarea id="player-input" placeholder="무엇을 하시겠습니까?" rows="2"></textarea>
+        <button id="send-btn">보내기</button>
+      </div>
+
+      <div id="detail-panel" style="display:none;">
+        <h3>상세 정보 <button id="detail-close" style="float:right;background:none;border:1px solid #333;color:#888;padding:4px 10px;font-size:11px;cursor:pointer;border-radius:4px;">닫기</button></h3>
+        <div id="detail-content"></div>
+      </div>
+
+      <button id="toggle-detail">📊 상태</button>
+      <button id="toggle-index">📖 목차</button>
+      <button id="log-btn">⏪ 이전글</button>
+      <button id="save-btn">🔖</button>
+
+      <!-- 이전 글 로그 -->
+      <div id="log-overlay">
+        <button id="log-close">닫기</button>
+        <div class="log-content" id="log-content"></div>
+      </div>
+
+      <!-- 목차 패널 -->
+      <div id="index-panel" style="display:none;">
+        <h3>목차</h3>
+        <div id="index-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game-state.js"></script>
+  <script src="chapters.js"></script>
+  <script src="state-calc.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
