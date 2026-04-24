@@ -112,9 +112,10 @@ function splitIntoPages(text) {
   const pages = [];
   let current = [];
   let charCount = 0;
+  var pageLimit = 400; // 모바일에서 읽기 좋은 분량
 
   for (const para of paragraphs) {
-    if (charCount + para.length > 250 && current.length > 0) {
+    if (charCount + para.length > pageLimit && current.length > 0) {
       pages.push(current.join('\n\n'));
       current = [para];
       charCount = para.length;
