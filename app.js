@@ -237,7 +237,6 @@ function loadChapter(code) {
     var startReading = function() {
       if (readingStarted) return;
       readingStarted = true;
-      if (autoStartTimer) clearTimeout(autoStartTimer);
       imgDiv.removeEventListener('click', startReading);
       document.removeEventListener('keydown', spaceStart);
       narrativeText.removeEventListener('click', startReading);
@@ -268,8 +267,7 @@ function loadChapter(code) {
     };
     document.addEventListener('keydown', spaceStart);
 
-    // 3초 후 자동 시작 (이미지 로드 실패 대비)
-    var autoStartTimer = setTimeout(startReading, 3000);
+    // 3초 후 자동 시작 제거 — 터치해야만 넘어감
     return;
   }
 
