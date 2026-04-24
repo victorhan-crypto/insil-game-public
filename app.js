@@ -232,8 +232,15 @@ function loadChapter(code) {
     var img = document.createElement('img');
     img.src = currentChapter.image;
     img.alt = currentChapter.title;
-    img.onerror = function() {
-      // 이미지 로드 실패 시 바로 글 시작
+
+    var readingStarted = false;
+    var startReading = function() {
+      if (readingStarted) return;
+      readingStarted = true;
+      if (autoStartTimer) clearTimeout(autoStartTimer);
+      imgDiv.removeEventListener('click', startReading);
+      document.removeEventListener('keydown', spaceStart);
+      narrativeText.removeEventListener('click', startReading);
       narrativeText.innerHTML = '';
       appendText(currentChapter.title, 'chapter-title');
       appendText('\u2500\u2500\u2500', 'divider');
@@ -242,27 +249,28 @@ function loadChapter(code) {
         showIntervention();
       });
     };
+
+    img.onerror = function() { startReading(); };
     imgDiv.appendChild(img);
     narrativeText.appendChild(imgDiv);
 
-    // 이미지 클릭하면 글 시작
-    var startReading = function() {
-      imgDiv.removeEventListener('click', startReading);
-      document.removeEventListener('keydown', spaceStart);
-      narrativeText.innerHTML = '';
-      appendText(currentChapter.title, 'chapter-title');
-      appendText('\u2500\u2500\u2500', 'divider');
-      startPageMode(currentChapter.opening, function() {
-        appendText('\u2500\u2500\u2500', 'divider');
-        showIntervention();
-      });
-    };
+    // 탭 안내
+    var hint = document.createElement('div');
+    hint.className = 'page-hint';
+    hint.textContent = '\u25b6 탭하여 시작';
+    narrativeText.appendChild(hint);
+
+    // 이미지 클릭, 화면 클릭, 스페이스 모두 시작
+    imgDiv.addEventListener('click', startReading);
+    narrativeText.addEventListener('click', startReading);
     var spaceStart = function(e) {
       if (e.code === 'Space') { e.preventDefault(); startReading(); }
     };
-    imgDiv.addEventListener('click', startReading);
     document.addEventListener('keydown', spaceStart);
-    return; // 이미지만 보여주고 대기
+
+    // 3초 후 자동 시작 (이미지 로드 실패 대비)
+    var autoStartTimer = setTimeout(startReading, 3000);
+    return;
   }
 
   appendText(currentChapter.title, 'chapter-title');
