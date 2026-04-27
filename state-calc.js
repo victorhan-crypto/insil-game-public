@@ -89,6 +89,9 @@ function getGoldPrice(year) {
 function parseAction(text) {
   const t = text.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
+  // 부정어 감지
+  var isNegative = /안 |안한|안해|안낸|안다|안사|안갈|안할|하지 않|하지않|포기|거절|싫|안 할|안 사|안 갈|필요없|관두|그만/.test(t);
+
   // 금액 추출 (만원, 원)
   let amount = 0;
   const manwonMatch = t.match(/(\d+)\s*만\s*원/);
@@ -163,6 +166,7 @@ function parseAction(text) {
     return { type: 'BUY_STOCK', amount };
   }
   if (t.includes('학원') || t.includes('등록금') || t.includes('학비')) {
+    if (isNegative) return { type: 'NONE', amount: 0 };
     return { type: 'SPEND_EDUCATION', amount: amount || 300000 };
   }
   if (t.includes('선물') || t.includes('사줘') || t.includes('사준다') || t.includes('핸드크림') || t.includes('양말') || t.includes('구두')) {
