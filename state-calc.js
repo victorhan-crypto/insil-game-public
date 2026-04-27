@@ -149,6 +149,10 @@ function parseAction(text, state) {
   if ((t.includes('갚') || t.includes('상환')) && (t.includes('만원') || t.includes('돈') || t.includes('빚') || t.includes('사채'))) {
     return { type: 'REPAY', amount };
   }
+  // "아버지 사채 대신 갚아드린다" 등 가족 빚 대납
+  if ((t.includes('아버지') || t.includes('아빠')) && (t.includes('사채') || t.includes('빚')) && amount > 0) {
+    return { type: 'SUPPORT_FAMILY', amount, target: 'father' };
+  }
   if ((t.includes('부동산') || t.includes('아파트') || t.includes('집')) && (t.includes('산다') || t.includes('사') || t.includes('매수') || t.includes('계약'))) {
     return { type: 'BUY_REALESTATE', amount };
   }
@@ -196,7 +200,7 @@ function parseAction(text, state) {
   if (t.includes('이직') || t.includes('전직') || t.includes('옮기') || t.includes('증권사') || t.includes('그만두')) {
     return { type: 'CHANGE_JOB', amount: 0 };
   }
-  if ((t.includes('승연') || t.includes('은지') || t.includes('어머니') || t.includes('엄마') || t.includes('아버지') || t.includes('아빠')) && (t.includes('등록금') || t.includes('생활비') || t.includes('병원비') || t.includes('도와') || t.includes('보내'))) {
+  if ((t.includes('승연') || t.includes('은지') || t.includes('어머니') || t.includes('엄마') || t.includes('아버지') || t.includes('아빠')) && (t.includes('등록금') || t.includes('생활비') || t.includes('병원비') || t.includes('도와') || t.includes('보내') || t.includes('드린') || t.includes('드렸') || t.includes('드려') || t.includes('줬') || t.includes('줘') || t.includes('준다') || t.includes('줄게') || t.includes('낸다') || t.includes('내') || t.includes('갚'))) {
     return { type: 'SUPPORT_FAMILY', amount: amount || 500000, target: extractTarget(t) };
   }
   if ((t.includes('정보') || t.includes('김실장') || t.includes('김 실장')) && (t.includes('산다') || t.includes('사') || t.includes('거래') || t.includes('받'))) {
