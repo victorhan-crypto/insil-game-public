@@ -235,6 +235,9 @@ function loadChapter(code) {
   narrativeText.innerHTML = '';
   currentIntervention = gameState.get().story.current_intervention || 0;
 
+  // 번역이 필요한지 확인
+  var needsTranslation = (typeof currentLang !== 'undefined') && currentLang !== 'ko' && apiClient;
+
   // 챕터 이미지 표시 (클릭하면 글 시작)
   if (currentChapter.image) {
     var imgDiv = document.createElement('div');
@@ -252,46 +255,68 @@ function loadChapter(code) {
       document.removeEventListener('keydown', spaceStart);
       narrativeText.removeEventListener('click', startReading);
       narrativeText.innerHTML = '';
-      appendText(currentChapter.title, 'chapter-title');
-      appendText('\u2500\u2500\u2500', 'divider');
-      // 짧은 딜레이로 첫 페이지 넘김 방지
-      setTimeout(function() {
-        startPageMode(currentChapter.opening, function() {
-          appendText('\u2500\u2500\u2500', 'divider');
-          showIntervention();
+
+      if (needsTranslation) {
+        appendText(currentChapter.title, 'chapter-title');
+        appendText('\u2500\u2500\u2500', 'divider');
+        showLoading(true);
+        apiClient.translateText(currentChapter.opening, currentLang).then(function(translated) {
+          showLoading(false);
+          setTimeout(function() {
+            startPageMode(translated, function() {
+              appendText('\u2500\u2500\u2500', 'divider');
+              showIntervention();
+            });
+          }, 300);
         });
-      }, 300);
+      } else {
+        appendText(currentChapter.title, 'chapter-title');
+        appendText('\u2500\u2500\u2500', 'divider');
+        setTimeout(function() {
+          startPageMode(currentChapter.opening, function() {
+            appendText('\u2500\u2500\u2500', 'divider');
+            showIntervention();
+          });
+        }, 300);
+      }
     };
 
     img.onerror = function() { startReading(); };
     imgDiv.appendChild(img);
     narrativeText.appendChild(imgDiv);
 
-    // 탭 안내
     var hint = document.createElement('div');
     hint.className = 'page-hint';
     hint.textContent = t('tapToStart');
     narrativeText.appendChild(hint);
 
-    // 이미지 클릭, 화면 클릭, 스페이스 모두 시작
     imgDiv.addEventListener('click', startReading);
     narrativeText.addEventListener('click', startReading);
     var spaceStart = function(e) {
       if (e.code === 'Space') { e.preventDefault(); startReading(); }
     };
     document.addEventListener('keydown', spaceStart);
-
-    // 3초 후 자동 시작 제거 — 터치해야만 넘어감
     return;
   }
 
   appendText(currentChapter.title, 'chapter-title');
   appendText('\u2500\u2500\u2500', 'divider');
 
-  startPageMode(currentChapter.opening, () => {
-    appendText('\u2500\u2500\u2500', 'divider');
-    showIntervention();
-  });
+  if (needsTranslation) {
+    showLoading(true);
+    apiClient.translateText(currentChapter.opening, currentLang).then(function(translated) {
+      showLoading(false);
+      startPageMode(translated, () => {
+        appendText('\u2500\u2500\u2500', 'divider');
+        showIntervention();
+      });
+    });
+  } else {
+    startPageMode(currentChapter.opening, () => {
+      appendText('\u2500\u2500\u2500', 'divider');
+      showIntervention();
+    });
+  }
 }
 
 // ═══════ 개입 표시 ═══════════════════════════════════════════════════
@@ -307,29 +332,52 @@ function showIntervention() {
     return;
   }
 
-  if (intervention.context && intervention.context.trim()) {
-    const lastNarrative = narrativeText.lastElementChild?.textContent || '';
-    const contextTrimmed = intervention.context.trim();
-    if (lastNarrative.includes(contextTrimmed) || contextTrimmed.length < 20) {
-      appendText('\u2500\u2500\u2500', 'divider');
-      appendText(dynamicSituation(intervention.situation), 'intervention');
-      enableInput();
-      playerInput.focus();
-      scrollToBottom();
-    } else {
-      startPageMode(intervention.context, () => {
-        appendText('\u2500\u2500\u2500', 'divider');
-        appendText(dynamicSituation(intervention.situation), 'intervention');
-        enableInput();
-        playerInput.focus();
-        scrollToBottom();
-      });
-    }
-  } else {
-    appendText(dynamicSituation(intervention.situation), 'intervention');
+  var needsTranslation = (typeof currentLang !== 'undefined') && currentLang !== 'ko' && apiClient;
+
+  // 번역 후 표시하는 헬퍼
+  function showSituationText(situationText) {
+    appendText(dynamicSituation(situationText), 'intervention');
     enableInput();
     playerInput.focus();
     scrollToBottom();
+  }
+
+  function displayIntervention(contextText, situationText) {
+    if (contextText && contextText.trim()) {
+      const lastNarrative = narrativeText.lastElementChild?.textContent || '';
+      const contextTrimmed = contextText.trim();
+      if (lastNarrative.includes(contextTrimmed) || contextTrimmed.length < 20) {
+        appendText('\u2500\u2500\u2500', 'divider');
+        showSituationText(situationText);
+      } else {
+        startPageMode(contextText, () => {
+          appendText('\u2500\u2500\u2500', 'divider');
+          showSituationText(situationText);
+        });
+      }
+    } else {
+      showSituationText(situationText);
+    }
+  }
+
+  if (needsTranslation) {
+    // context와 situation 둘 다 번역
+    var contextPromise = (intervention.context && intervention.context.trim())
+      ? apiClient.translateText(intervention.context, currentLang)
+      : Promise.resolve('');
+    var situationPromise = apiClient.translateText(intervention.situation, currentLang);
+
+    showLoading(true);
+    Promise.all([contextPromise, situationPromise]).then(function(results) {
+      showLoading(false);
+      displayIntervention(results[0], results[1]);
+    }).catch(function() {
+      showLoading(false);
+      // 번역 실패 시 원본 표시
+      displayIntervention(intervention.context, intervention.situation);
+    });
+  } else {
+    displayIntervention(intervention.context, intervention.situation);
   }
 }
 
@@ -499,11 +547,24 @@ async function handleInput() {
       gameState.save();
 
       if (textAfter) {
-        appendText('\u2500\u2500\u2500', 'divider');
-        startPageMode(textAfter, () => {
+        var needsTrans = (typeof currentLang !== 'undefined') && currentLang !== 'ko' && apiClient;
+        if (needsTrans) {
+          showLoading(true);
+          apiClient.translateText(textAfter, currentLang).then(function(translated) {
+            showLoading(false);
+            appendText('\u2500\u2500\u2500', 'divider');
+            startPageMode(translated, () => {
+              appendText('\u2500\u2500\u2500', 'divider');
+              setTimeout(() => showIntervention(), 300);
+            });
+          });
+        } else {
           appendText('\u2500\u2500\u2500', 'divider');
-          setTimeout(() => showIntervention(), 300);
-        });
+          startPageMode(textAfter, () => {
+            appendText('\u2500\u2500\u2500', 'divider');
+            setTimeout(() => showIntervention(), 300);
+          });
+        }
       } else {
         appendText('\u2500\u2500\u2500', 'divider');
         setTimeout(() => showIntervention(), 300);

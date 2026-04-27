@@ -296,4 +296,33 @@ ${hints.details ? `═══ 서사 힌트 ═══\n톤: ${hints.tone}\n디테
       }
     }
   }
+
+  // ═══ 텍스트 번역 (opening, intervention 등) ═══
+  async translateText(text, targetLang) {
+    if (!text || !text.trim()) return text;
+    if (targetLang === 'ko') return text;
+
+    // 캐시 확인
+    var cacheKey = targetLang + ':' + text.substring(0, 80);
+    if (!this._transCache) this._transCache = {};
+    if (this._transCache[cacheKey]) return this._transCache[cacheKey];
+
+    var langName = targetLang === 'en' ? 'English' : '日本語';
+    var langInst = targetLang === 'en'
+      ? 'Translate the following Korean text into natural, literary English. Keep character names in romanized Korean (Seungsu, Eunji, Dongjun, Seungyeon, Manseok). Keep the short-sentence literary style. Keep paragraph breaks. Do NOT add any explanation.'
+      : '以下の韓国語テキストを自然で文学的な日本語に翻訳してください。人物名は韓国語の発音のまま（スンス、ウンジ、ドンジュン、スンヨン、マンソク）。短文の文学的スタイルを維持。段落区切りを維持。説明は不要。';
+
+    var prompt = langInst + '\n\n---\n' + text + '\n---\n\nTranslation:';
+
+    try {
+      var result = await this.callGemini(prompt, { temperature: 0.3, maxTokens: 2048 });
+      // "Translation:" 이후만 추출 (혹시 포함되어 있으면)
+      result = result.replace(/^Translation:\s*/i, '').trim();
+      this._transCache[cacheKey] = result;
+      return result;
+    } catch (e) {
+      console.error('번역 오류:', e);
+      return text; // 실패 시 원본 반환
+    }
+  }
 }
