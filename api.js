@@ -238,7 +238,7 @@ ${JSON.stringify(currentState.assets, null, 2)}
 5. 큰 사건(경제 이벤트)은 절대 바꾸지 마라. 역사는 고정이다.
 6. 최소 400자, 최대 800자. 너무 짧으면 안 된다.
 7. 마지막 문장은 다음 장면으로 자연스럽게 이어지는 여운을 남겨라.
-8. 금액을 절대 지어내지 마라. 아래 플레이어 상태에 나온 금액만 사용해라.
+8. 금액을 절대 지어내지 마라. 아래 "경제 상황"과 "자산 변동"에 나온 숫자만 사용해라. 없는 금액을 만들어내지 마라. 800만원, 500만원 같은 숫자를 임의로 쓰지 마라. 구체적 금액이 필요하면 아래 제공된 숫자만 써라. 금액을 모르면 금액을 쓰지 마라.
 9. 투자 성공 시 — 숫자의 쾌감을 살려라. 통장 잔고가 올라가는 순간, 환율 차이로 돈을 번 순간을 생생하게.
 10. 조만석 관련 — 승수가 우위에 설 때 통쾌함을 살려라. 조만석이 당황하는 모습, 계산이 틀어지는 순간.
 11. 시대 소품을 적극 활용해라. 그 시절 노래, 영화, 음식, 물건이 나오면 몰입감이 올라간다.
@@ -256,6 +256,7 @@ ${relDesc.join(' ')}
 현금: ${Math.floor(cash/10000)}만원 (정확히 ${cash.toLocaleString()}원)
 ${state.assets.usd > 0 ? '달러: $' + state.assets.usd + ' 보유 중' : ''}
 ${state.assets.gold_gram > 0 ? '금: ' + state.assets.gold_gram + 'g 보유 중' : ''}
+${state.assets.stocks && state.assets.stocks.length > 0 ? '주식: ' + state.assets.stocks[0].name + ' ' + state.assets.stocks[0].quantity + '주 보유 중 (매수 지수 ' + state.assets.stocks[0].buyIndex + ')' : '주식: 없음'}
 ${state.assets.debt && state.assets.debt.length > 0 ? '빚: ' + state.assets.debt.map(d => d.source + ' ' + Math.floor(d.amount/10000) + '만원').join(', ') : ''}
 스토리 속 고정 금액 (절대 바꾸지 마라. 현재 자산과 혼동하지 마라):
 - 할머니가 준 돈: 200만원 (게임 시작 자산. 현재 통장 잔고와 다르다. 할머니 돈을 언급할 때는 반드시 200만원이라고 써라)
