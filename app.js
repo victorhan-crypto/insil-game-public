@@ -233,6 +233,7 @@ function loadChapter(code) {
   }
 
   narrativeText.innerHTML = '';
+  pageLog = []; // 챕터 전환 시 이전 글 로그 초기화
   currentIntervention = gameState.get().story.current_intervention || 0;
 
   // 번역이 필요한지 확인
@@ -490,6 +491,8 @@ function goToNextChapter() {
 
     gameState.update({ story: { current_chapter: nextCode, current_intervention: 0 } });
     currentIntervention = 0;
+    // 챕터 전환 시 대화 기록 초기화 (이전 챕터 서사가 다음 챕터에 영향 주지 않도록)
+    gameState.history = [];
     gameState.save();
     updateStatusBar();
 
