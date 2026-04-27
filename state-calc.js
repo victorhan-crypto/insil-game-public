@@ -204,7 +204,9 @@ function parseAction(text, state) {
   // ═══ 13. 교육비 ═══
   if (t.includes('학원') || t.includes('등록금') || t.includes('학비') || t.includes('수업료') || t.includes('과외')) {
     if (isNegative) return { type: 'NONE', amount: 0 };
-    return { type: 'SPEND_EDUCATION', amount: amount || 300000 };
+    // 등록금/학비는 기본 180만원 (반액 장학금), 학원/과외는 30만원
+    var eduDefault = (t.includes('등록금') || t.includes('학비')) ? 1800000 : 300000;
+    return { type: 'SPEND_EDUCATION', amount: amount || eduDefault };
   }
 
   // ═══ 14. 선물/기프트 ═══
