@@ -364,23 +364,86 @@ function calculateStateLocal(action, state, year, month) {
     narrative_hints: { tone: 'neutral', details: action }
   };
 
-  // ═══ 자동 대출 헬퍼 — 현금 부족 시 부족분만큼 대출 (한도 없음) ═══
+  // ═══ 자동 대출 헬퍼 — 금액 규모에 따라 대출 소스 자동 결정 ═══
   function autoLoan(needed, currentCash) {
     var shortage = needed - currentCash;
     if (shortage <= 0) return null;
-    // 직업에 따라 대출 조건이 다름
+
+    var loans = [];
+    var remaining = shortage;
     var job = state.stats.job || '';
-    var source, rate;
-    if (job === 'banker' || job === 'securities') {
-      source = '은행대출'; rate = 6;
-    } else if (job === 'business' || job === 'manseok_employee') {
-      source = '사업자대출'; rate = 8;
-    } else if (shortage > 50000000) {
-      source = '담보대출'; rate = 7;
-    } else {
-      source = '신용대출'; rate = 12;
+    var hasCard = state.stats && state.stats.has_card;
+    var year = state.player.year;
+
+    // 1단계: 카드 대출 (500만원까지, 카드 있을 때)
+    if (hasCard && remaining > 0) {
+      var cardMax = (year >= 2001 && year <= 2003) ? 10000000 : 3000000;
+      var cardLoan = Math.min(remaining, cardMax);
+      loans.push({ source: '카드대출', amount: cardLoan, rate: 20 });
+      remaining -= cardLoan;
     }
-    return { source: source, amount: shortage, rate: rate };
+
+    // 2단계: 은행 대출 (직장인이면 연봉의 3배까지)
+    if (remaining > 0 && (job === 'banker' || job === 'securities' || job === 'business' || job === 'manseok_employee')) {
+      var salary = job === 'banker' ? 14400000 : (job === 'securities' ? 21600000 : 24000000);
+      var bankMax = salary * 3;
+      var bankLoan = Math.min(remaining, bankMax);
+      loans.push({ source: '은행대출', amount: bankLoan, rate: 6 });
+      remaining -= bankLoan;
+    }
+
+    // 3단계: 담보대출 (부동산/건물 있으면 시가의 70%)
+    if (remaining > 0) {
+      var collateral = 0;
+      if (state.assets.real_estate && state.assets.real_estate.length > 0) collateral += state.assets.real_estate[0].value || 0;
+      if (state.assets.buildings) {
+        var bArr = Array.isArray(state.assets.buildings) ? state.assets.buildings : [state.assets.buildings];
+        for (var bi = 0; bi < bArr.length; bi++) collateral += bArr[bi].value || 0;
+      }
+      if (collateral > 0) {
+        var mortgageMax = Math.floor(collateral * 0.7);
+        var mortgageLoan = Math.min(remaining, mortgageMax);
+        loans.push({ source: '담보대출', amount: mortgageLoan, rate: 5 });
+        remaining -= mortgageLoan;
+      }
+    }
+
+    // 4단계: 신용대출 (5000만원까지)
+    if (remaining > 0) {
+      var creditMax = 50000000;
+      var creditLoan = Math.min(remaining, creditMax);
+      loans.push({ source: '신용대출', amount: creditLoan, rate: 12 });
+      remaining -= creditLoan;
+    }
+
+    // 5단계: 지인 차용 (3000만원까지)
+    if (remaining > 0) {
+      var friendMax = 30000000;
+      var friendLoan = Math.min(remaining, friendMax);
+      loans.push({ source: '지인차용', amount: friendLoan, rate: 5 });
+      remaining -= friendLoan;
+    }
+
+    // 6단계: 사채 (나머지 전액, 한도 없음)
+    if (remaining > 0) {
+      loans.push({ source: '사채', amount: remaining, rate: 36 });
+      remaining = 0;
+    }
+
+    // 대출 합산
+    if (loans.length === 0) return null;
+    var totalLoan = 0;
+    var summaryParts = [];
+    for (var li = 0; li < loans.length; li++) {
+      totalLoan += loans[li].amount;
+      summaryParts.push(loans[li].source + ' ' + Math.floor(loans[li].amount/10000) + '만원(연' + loans[li].rate + '%)');
+    }
+
+    return {
+      loans: loans,
+      totalAmount: totalLoan,
+      summary: summaryParts.join(' + ')
+    };
   }
   const cash = state.assets.cash_krw;
 
@@ -1084,34 +1147,33 @@ function calculateStateLocal(action, state, year, month) {
   var cashChange = result.state_changes.assets.cash_krw || 0;
   var projectedCash = cash + cashChange;
   if (projectedCash < 0 && result.action_valid !== false) {
-    var shortage = Math.abs(projectedCash) + 100000; // 10만원 여유
-    var loan = autoLoan(shortage, 0);
-    if (loan) {
-      // 기존 부채에 추가
-      if (!result.state_changes.assets.debt) {
-        result.state_changes.assets.debt = loan;
+    var shortage = Math.abs(projectedCash) + 100000;
+    var loanResult = autoLoan(shortage + cash, cash); // 부족분 계산
+    if (loanResult) {
+      // 각 대출을 부채에 추가
+      for (var li = 0; li < loanResult.loans.length; li++) {
+        var l = loanResult.loans[li];
+        if (l.source === '카드대출') {
+          // 카드 부채로 추가
+          result.state_changes.stats = result.state_changes.stats || {};
+          result.state_changes.stats.card_debt = (state.stats.card_debt || 0) + l.amount;
+        } else if (l.source === '지인차용') {
+          // 관계도 영향
+          result.state_changes.relationships = result.state_changes.relationships || {};
+          result.state_changes.relationships.dongjun = (result.state_changes.relationships.dongjun || 0) - 10;
+          if (!result.state_changes.assets.debt) result.state_changes.assets.debt = l;
+        } else {
+          // 일반 부채
+          if (!result.state_changes.assets.debt) {
+            result.state_changes.assets.debt = l;
+          }
+          // 추가 부채는 applyStateChanges에서 배열에 push됨
+        }
       }
-      // 현금에 대출금 추가
-      result.state_changes.assets.cash_krw = cashChange + loan.amount;
-      result.asset_summary = (result.asset_summary || '') + ' | ' + loan.source + ' ' + Math.floor(loan.amount/10000) + '만원 차입 (연 ' + loan.rate + '%)';
+      result.state_changes.assets.cash_krw = cashChange + loanResult.totalAmount;
+      result.asset_summary = (result.asset_summary || '') + ' | 차입: ' + loanResult.summary;
       result.narrative_hints.loanTaken = true;
-    }
-  }
-
-  // 거절된 행동도 현금 부족이 이유면 자동 대출로 재시도
-  if (result.action_valid === false && result.rejection_reason && /현금|부족|계약금|등록금|학비/.test(result.rejection_reason)) {
-    // 거절 해제하고 자동 대출 적용
-    result.action_valid = true;
-    result.rejection_reason = null;
-    // 필요 금액 추정
-    var neededMatch = result.rejection_reason_amount || parsed.amount || 5000000;
-    var loan2 = autoLoan(neededMatch, cash);
-    if (loan2) {
-      result.state_changes.assets.cash_krw = (result.state_changes.assets.cash_krw || 0) + loan2.amount;
-      if (!result.state_changes.assets.debt) {
-        result.state_changes.assets.debt = loan2;
-      }
-      result.asset_summary = (result.asset_summary || '') + loan2.source + ' ' + Math.floor(loan2.amount/10000) + '만원 차입 (연 ' + loan2.rate + '%)';
+      result.narrative_hints.loanDetails = loanResult.summary;
     }
   }
 
