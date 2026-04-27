@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0a0a0a">
+  <meta name="theme-color" content="#1a1714">
   <title>인생은 실전이야</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -58,14 +58,14 @@
       </div>
 
       <div id="detail-panel" style="display:none;">
-        <h3>상세 정보 <button id="detail-close" style="float:right;background:none;border:1px solid #333;color:#888;padding:4px 10px;font-size:11px;cursor:pointer;border-radius:4px;">닫기</button></h3>
+        <h3>상세 정보 <button id="detail-close">닫기</button></h3>
         <div id="detail-content"></div>
       </div>
 
-      <button id="toggle-detail">📊 상태</button>
-      <button id="toggle-index">📖 목차</button>
-      <button id="log-btn">⏪ 이전글</button>
-      <button id="save-btn">🔖</button>
+      <button id="log-btn" title="이전글">◁</button>
+      <button id="save-btn" title="저장">♡</button>
+      <button id="toggle-index" title="목차">≡</button>
+      <button id="toggle-detail" title="상태">◈</button>
 
       <!-- 이전 글 로그 -->
       <div id="log-overlay">
