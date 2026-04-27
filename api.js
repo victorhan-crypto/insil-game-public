@@ -297,6 +297,74 @@ ${hints.details ? `═══ 서사 힌트 ═══\n톤: ${hints.tone}\n디테
     }
   }
 
+  // ═══ 행동 분류 (Gemini fallback) ═══
+  async classifyAction(playerAction, situation, state) {
+    var cash = state.assets.cash_krw || 0;
+    var prompt = `너는 경제 시뮬레이션 게임의 행동 분류기다.
+플레이어가 입력한 행동을 분석해서 JSON으로 분류해라.
+
+가능한 행동 유형:
+- BUY_USD: 달러 매수 (환전)
+- SELL_USD: 달러 매도
+- BUY_GOLD: 금 매수
+- SELL_GOLD: 금 매도
+- BUY_STOCK: 주식 매수
+- SELL_STOCK: 주식 매도
+- BUY_FUND: 펀드 투자
+- SELL_FUND: 펀드 환매
+- BUY_REALESTATE: 부동산 매수
+- SELL_REALESTATE: 부동산 매도
+- BUY_BUILDING: 건물/상가 매수
+- SELL_BUILDING: 건물/상가 매도
+- BUY_BUSINESS: 사업체 인수/창업
+- SELL_BUSINESS: 사업체 매각
+- DEPOSIT: 예금/저축
+- BORROW: 대출/사채 차입
+- REPAY: 빚 상환
+- SPEND_EDUCATION: 학비/등록금/학원비 지출
+- SPEND_GIFT: 선물/기프트 구매
+- SPEND: 일반 지출 (돈을 쓰는 행동)
+- WORK: 취직/알바 시작
+- CHANGE_JOB: 이직/퇴사
+- SUPPORT_FAMILY: 가족에게 금전 지원 (target: father/mother/seungyeon)
+- ACCEPT_DEAL: 조만석 딜 수락
+- REJECT_DEAL: 조만석 딜 거절
+- BUY_INFO: 정보 구매
+- BUY_INSURANCE: 보험 가입
+- MOVE: 이사
+- STUDY: 유학/자격증/자기계발
+- LEVERAGE_TRADE: 레버리지/파생 거래
+- GO_COLLEGE: 대학 진학
+- SKIP_COLLEGE: 대학 포기
+- FORGIVE_DONGJUN: 동준 용서
+- REJECT_DONGJUN: 동준 거절
+- CONFESS_FATHER: 아버지에게 진실 고백
+- TELL_SEUNGYEON: 승연에게 진실 알림
+- INFO: 정보 수집 (신문/공부)
+- SOCIAL_FAMILY: 가족과 대화 (금전 아님)
+- SOCIAL_FRIEND: 친구와 대화
+- SOCIAL: 기타 대화/행동
+- NONE: 아무것도 안 함
+
+현재 상황: ${situation}
+플레이어 현금: ${Math.floor(cash/10000)}만원
+
+플레이어 입력: "${playerAction}"
+
+JSON 형식으로만 응답해라:
+{"type": "행동유형", "amount": 금액(원단위숫자, 없으면 0), "target": "대상(있으면)"}`;
+
+    try {
+      var text = await this.callGemini(prompt, { temperature: 0.1, json: true, maxTokens: 256 });
+      var result = JSON.parse(text);
+      console.log('Gemini 행동 분류:', result);
+      return result;
+    } catch (e) {
+      console.error('행동 분류 실패:', e);
+      return null;
+    }
+  }
+
   // ═══ 텍스트 번역 (opening, intervention 등) ═══
   async translateText(text, targetLang) {
     if (!text || !text.trim()) return text;

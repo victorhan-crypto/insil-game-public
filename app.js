@@ -493,11 +493,62 @@ async function handleInput() {
 
   try {
     // 1. 상태 계산 (로컬 — API 호출 없음)
-    const stateResult = calculateStateLocal(
+    let stateResult = calculateStateLocal(
       action, state, state.player.year, state.player.month
     );
 
     console.log('로컬 상태 계산 결과:', JSON.stringify(stateResult, null, 2));
+
+    // 1.5. Gemini fallback — 로컬에서 분류 못 한 경우
+    var needsFallback = (
+      stateResult.action_type === 'SOCIAL' ||
+      stateResult.action_type === 'SOCIAL_FAMILY' ||
+      stateResult.action_type === 'SOCIAL_FRIEND' ||
+      stateResult.action_type === 'NONE'
+    );
+    // 금액이 언급됐거나, 경제 키워드가 있으면 fallback 시도
+    var hasMoneyHint = /\d|만원|원|돈|통장|현금|투자|매수|매도|사채|빚|등록|학비|월세|보험|펀드|주식|달러|금|예금|저축|대출|상환|갚|환전/.test(action);
+    if (needsFallback && hasMoneyHint && apiClient) {
+      console.log('Gemini fallback 시도...');
+      var situationText = intervention ? intervention.situation : '';
+      var classified = await apiClient.classifyAction(action, situationText, state);
+      if (classified && classified.type && classified.type !== 'SOCIAL' && classified.type !== 'SOCIAL_FAMILY' && classified.type !== 'SOCIAL_FRIEND') {
+        // Gemini가 분류한 행동으로 재계산
+        var reclassifiedAction = action;
+        // 금액이 있으면 행동 텍스트에 추가 (parseAction이 금액을 추출할 수 있도록)
+        if (classified.amount > 0 && !/\d/.test(action)) {
+          reclassifiedAction = action + ' ' + Math.floor(classified.amount / 10000) + '만원';
+        }
+        // 타입에 맞는 키워드를 추가해서 로컬 파서가 잡을 수 있게
+        var typeKeywords = {
+          'BUY_USD': '달러 산다', 'SELL_USD': '달러 판다',
+          'BUY_GOLD': '금 산다', 'SELL_GOLD': '금 판다',
+          'BUY_STOCK': '주식 산다', 'SELL_STOCK': '주식 판다',
+          'BUY_FUND': '펀드 산다', 'SELL_FUND': '펀드 판다',
+          'BUY_REALESTATE': '부동산 산다', 'SELL_REALESTATE': '부동산 판다',
+          'BUY_BUILDING': '건물 산다', 'SELL_BUILDING': '건물 판다',
+          'BUY_BUSINESS': '사업체 산다', 'SELL_BUSINESS': '사업체 판다',
+          'DEPOSIT': '예금', 'BORROW': '사채 빌린다', 'REPAY': '빚 갚는다',
+          'SPEND_EDUCATION': '등록금 낸다', 'SPEND_GIFT': '선물 산다',
+          'SPEND': '돈 쓴다', 'WORK': '알바 한다', 'CHANGE_JOB': '이직',
+          'SUPPORT_FAMILY': '가족 돈 준다', 'BUY_INFO': '정보 산다',
+          'BUY_INSURANCE': '보험 가입', 'MOVE': '이사', 'STUDY': '공부',
+          'LEVERAGE_TRADE': '레버리지', 'GO_COLLEGE': '대학 간다',
+          'SKIP_COLLEGE': '대학 포기', 'ACCEPT_DEAL': '딜 수락',
+          'REJECT_DEAL': '딜 거절', 'FORGIVE_DONGJUN': '동준 용서',
+          'REJECT_DONGJUN': '동준 거절', 'CONFESS_FATHER': '아버지 사실 말한다',
+          'TELL_SEUNGYEON': '승연 조현우 알려', 'INFO': '신문 읽는다'
+        };
+        if (typeKeywords[classified.type]) {
+          reclassifiedAction = typeKeywords[classified.type] + ' ' + reclassifiedAction;
+          if (classified.amount > 0) {
+            reclassifiedAction += ' ' + Math.floor(classified.amount / 10000) + '만원';
+          }
+        }
+        stateResult = calculateStateLocal(reclassifiedAction, state, state.player.year, state.player.month);
+        console.log('Gemini fallback 재계산:', JSON.stringify(stateResult, null, 2));
+      }
+    }
 
     // 2. 상태 업데이트 (자산 차감 포함)
     if (stateResult.action_valid !== false) {
