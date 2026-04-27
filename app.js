@@ -209,7 +209,7 @@ document.getElementById('save-btn').addEventListener('click', () => {
   btn.textContent = '\u2705';
   btn.style.borderColor = '#4a6a4a';
   setTimeout(() => {
-    btn.textContent = '\ud83d\udd16';
+    btn.textContent = '\u2661';
     btn.style.borderColor = '';
   }, 1500);
 });
