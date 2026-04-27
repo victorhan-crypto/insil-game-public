@@ -142,7 +142,7 @@ function parseAction(text, state) {
   }
 
   // ═══ 2. 금 거래 ═══
-  if ((t.includes('금') && !t.includes('등록금') && !t.includes('현금') && !t.includes('세금') && !t.includes('금리') && !t.includes('금모으기') && !t.includes('금융')) ||
+  if ((t.includes('금') && !t.includes('등록금') && !t.includes('현금') && !t.includes('세금') && !t.includes('금리') && !t.includes('금모으기') && !t.includes('금융') && !t.includes('종금') && !t.includes('자금') && !t.includes('기금') && !t.includes('금지') && !t.includes('금액') && !t.includes('금요') && !t.includes('금방') && !t.includes('금고') && !t.includes('출금') && !t.includes('입금') && !t.includes('송금') && !t.includes('환금') && !t.includes('벌금')) ||
       t.includes('골드') || t.includes('금은방')) {
     if (SELL) return { type: 'SELL_GOLD', amount };
     if (BUY || GIVE || PAY) return { type: 'BUY_GOLD', amount };
