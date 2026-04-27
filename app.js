@@ -795,8 +795,9 @@ function dynamicSituation(text) {
   if (!gameState || !gameState.get) return text;
   var s = gameState.get();
   var result = text;
+  var cashText = gameState.formatCash();
 
-  // 플레이어 보유 주식명으로 치환
+  // ═══ 1. 포항제철 → 플레이어 보유 종목 ═══
   var stocks = s.assets.stocks;
   if (stocks && stocks.length > 0) {
     var stockName = stocks[0].name || '코스피';
@@ -806,20 +807,36 @@ function dynamicSituation(text) {
     result = result.replace(/포항제철이/g, stockName + '이');
     result = result.replace(/포항제철/g, stockName);
   } else {
-    // 주식 없으면 주식 관련 문구를 일반화
     result = result.replace(/증권 계좌에 포항제철 주식이 있다[.。]?/g, '');
     result = result.replace(/포항제철 주식이 원금을 넘었다[.。]?/g, '');
     result = result.replace(/포항제철을 팔아서 \d+만원 이익을 냈다[.。]?/g, '');
     result = result.replace(/포항제철/g, '주식');
   }
 
-  // intervention 텍스트의 "통장에 있다" 금액을 실제 현금으로 치환
-  var cashText = gameState.formatCash();
-  // "200만원이 통장에 있다" → "164만원이 통장에 있다"
+  // ═══ 2. 하드코딩된 금액 → 실제 자산 ═══
+  // "할머니가 준 200만원"은 보호 (고정 스토리)
+  result = result.replace(/할머니가 준 200만원/g, '##GRANDMA##');
+  result = result.replace(/할머니가 대학 가면 쓰라고 준 200만원/g, '##GRANDMA2##');
+  // "200만원을 줄 때" (할머니 관련)도 보호
+  result = result.replace(/200만원을 줄 때/g, '##GRANDMA3##');
+  // "동준이가 200만원을 잃었다" — 동준 돈은 고정
+  result = result.replace(/코스닥에서 200만원을 잃었다/g, '##DONGJUN_LOSS##');
+  result = result.replace(/200만원을 빌려달라/g, '##DONGJUN_BORROW##');
+
+  // 나머지 "200만원" → 실제 현금
+  result = result.replace(/200만원이 통장에/g, cashText + '이 통장에');
+  result = result.replace(/통장에 200만원/g, '통장에 ' + cashText);
+  result = result.replace(/통장을 보고 있다\. 200만원/g, '통장을 보고 있다. ' + cashText);
+  // "N만원이 통장에" 패턴 (200 외 다른 금액도)
   result = result.replace(/\d+만원이 통장에/g, cashText + '이 통장에');
-  // "통장에 돈이 있다" 패턴
   result = result.replace(/통장에 \d+만원/g, '통장에 ' + cashText);
-  // "통장에 돈이 있다" — 금액 없는 경우는 그대로
+
+  // 보호된 패턴 복원
+  result = result.replace(/##GRANDMA##/g, '할머니가 준 200만원');
+  result = result.replace(/##GRANDMA2##/g, '할머니가 대학 가면 쓰라고 준 200만원');
+  result = result.replace(/##GRANDMA3##/g, '200만원을 줄 때');
+  result = result.replace(/##DONGJUN_LOSS##/g, '코스닥에서 200만원을 잃었다');
+  result = result.replace(/##DONGJUN_BORROW##/g, '200만원을 빌려달라');
 
   return result;
 }
