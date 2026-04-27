@@ -784,20 +784,20 @@ function dynamicSituation(text) {
   var s = gameState.get();
   var result = text;
 
-  // 플레이어 보유 주식명으로 치환 (스토리 원본의 "포항제철"을 실제 보유 종목으로)
+  // 플레이어 보유 주식명으로 치환
   var stocks = s.assets.stocks;
   if (stocks && stocks.length > 0) {
     var stockName = stocks[0].name || '코스피';
-    // "포항제철 주식" → "코스닥 주식" 등
     result = result.replace(/포항제철 주식/g, stockName + ' 주식');
+    result = result.replace(/포항제철을 팔아서 \d+만원 이익을 냈다/g, stockName + ' 주식을 보유하고 있다');
     result = result.replace(/포항제철을/g, stockName + '을');
     result = result.replace(/포항제철이/g, stockName + '이');
     result = result.replace(/포항제철/g, stockName);
   } else {
     // 주식 없으면 주식 관련 문구를 일반화
-    result = result.replace(/증권 계좌에 포항제철 주식이 있다\./g, '증권 계좌가 있다.');
-    result = result.replace(/포항제철 주식이 원금을 넘었다\./g, '');
-    result = result.replace(/포항제철을 팔아서 \d+만원 이익을 냈다\./g, '');
+    result = result.replace(/증권 계좌에 포항제철 주식이 있다[.。]?/g, '');
+    result = result.replace(/포항제철 주식이 원금을 넘었다[.。]?/g, '');
+    result = result.replace(/포항제철을 팔아서 \d+만원 이익을 냈다[.。]?/g, '');
     result = result.replace(/포항제철/g, '주식');
   }
 
