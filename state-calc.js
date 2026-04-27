@@ -100,11 +100,16 @@ function parseAction(text) {
   const dollarMatch = t.match(/(\d+)\s*달러/);
   let dollarAmount = dollarMatch ? parseInt(dollarMatch[1]) : 0;
 
+  // "현금으로 바꿔", "원화로 환전" → 달러 매도
+  if ((t.includes('현금') || t.includes('원화')) && (t.includes('바꾸') || t.includes('환전') || t.includes('바꿔'))) {
+    return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+  }
+
   // 행동 분류
   if (t.includes('달러') && (t.includes('산다') || t.includes('사') || t.includes('환전') || t.includes('매수') || t.includes('바꾸'))) {
     return { type: 'BUY_USD', amount };
   }
-  if (t.includes('달러') && (t.includes('판다') || t.includes('팔') || t.includes('매도'))) {
+  if (t.includes('달러') && (t.includes('판다') || t.includes('팔') || t.includes('매도') || t.includes('환전') || t.includes('바꾸') || t.includes('현금'))) {
     return { type: 'SELL_USD', dollarAmount: dollarAmount || amount };
   }
   if (t.includes('금') && (t.includes('산다') || t.includes('사') || t.includes('매수'))) {
