@@ -1031,8 +1031,10 @@ function showGameResult() {
   var totalAssets = calcTotalAssets(s, 2007, 12);
   var cashText = gameState.formatCash();
 
-  // 리더보드에 기록 저장
+  // 리더보드에 기록 저장 (로컬 + 글로벌)
+  var playerName = localStorage.getItem('imf_player_name') || '익명';
   saveToLeaderboard(totalAssets);
+  saveToGlobalLeaderboard(playerName, totalAssets);
 
   narrativeText.innerHTML = '';
   disableInput();
@@ -1062,35 +1064,69 @@ function showGameResult() {
 
   var boardDiv = document.createElement('div');
   boardDiv.className = 'leaderboard';
-  var boardHTML = '<div class="lb-title">' + t('leaderboardTitle') + '</div>';
+  boardDiv.innerHTML = '<div class="lb-title">' + t('leaderboardTitle') + '</div><div class="lb-total" style="padding:20px;">로딩 중...</div>';
+  narrativeText.appendChild(boardDiv);
 
-  var top10 = board.slice(0, 10);
-  for (var i = 0; i < top10.length; i++) {
-    var entry = top10[i];
-    var rankIcon = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1) + '.'));
-    var isMe = entry.isLatest;
-    boardHTML += '<div class="lb-row' + (isMe ? ' lb-me' : '') + '">' +
-      '<span class="lb-rank">' + rankIcon + '</span>' +
-      '<span class="lb-name">' + entry.name + '</span>' +
-      '<span class="lb-asset">' + formatAssetFull(entry.assets) + '</span>' +
-      '</div>';
-  }
+  // 글로벌 리더보드 비동기 로드
+  getGlobalLeaderboard().then(function(globalBoard) {
+    var boardHTML = '<div class="lb-title">' + t('leaderboardTitle') + '</div>';
+    var displayBoard = globalBoard.length > 0 ? globalBoard : board;
+    var top10 = displayBoard.slice(0, 10);
+    var playerName = localStorage.getItem('imf_player_name') || '익명';
 
-  if (myRank > 10) {
-    boardHTML += '<div class="lb-row lb-me lb-gap">' +
-      '<span class="lb-rank">···</span>' +
-      '<span class="lb-name"></span>' +
-      '<span class="lb-asset"></span>' +
-      '</div>' +
-      '<div class="lb-row lb-me">' +
-      '<span class="lb-rank">' + myRank + '.</span>' +
-      '<span class="lb-name">' + t('thisPlay') + '</span>' +
-      '<span class="lb-asset">' + formatAssetFull(totalAssets) + '</span>' +
-      '</div>';
-  }
+    for (var i = 0; i < top10.length; i++) {
+      var entry = top10[i];
+      var rankIcon = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1) + '.'));
+      var isMe = entry.name === playerName && Math.abs(entry.assets - totalAssets) < 1000;
+      boardHTML += '<div class="lb-row' + (isMe ? ' lb-me' : '') + '">' +
+        '<span class="lb-rank">' + rankIcon + '</span>' +
+        '<span class="lb-name">' + entry.name + '</span>' +
+        '<span class="lb-asset">' + formatAssetFull(entry.assets) + '</span>' +
+        '</div>';
+    }
 
-  boardHTML += '<div class="lb-total">' + t('leaderboardTotal').replace('{n}', board.length) + '</div>';
-  boardDiv.innerHTML = boardHTML;
+    // 내 순위 찾기
+    var myGlobalRank = -1;
+    for (var gi = 0; gi < displayBoard.length; gi++) {
+      if (displayBoard[gi].name === playerName && Math.abs(displayBoard[gi].assets - totalAssets) < 1000) {
+        myGlobalRank = gi + 1;
+        break;
+      }
+    }
+    if (myGlobalRank < 0) myGlobalRank = displayBoard.length + 1;
+
+    if (myGlobalRank > 10) {
+      boardHTML += '<div class="lb-row lb-gap"><span class="lb-rank">···</span><span class="lb-name"></span><span class="lb-asset"></span></div>' +
+        '<div class="lb-row lb-me">' +
+        '<span class="lb-rank">' + myGlobalRank + '.</span>' +
+        '<span class="lb-name">' + playerName + '</span>' +
+        '<span class="lb-asset">' + formatAssetFull(totalAssets) + '</span>' +
+        '</div>';
+    }
+
+    getGlobalPlayCount().then(function(count) {
+      boardHTML += '<div class="lb-total">' + t('leaderboardTotal').replace('{n}', count || displayBoard.length) + '</div>';
+      boardDiv.innerHTML = boardHTML;
+    }).catch(function() {
+      boardHTML += '<div class="lb-total">' + t('leaderboardTotal').replace('{n}', displayBoard.length) + '</div>';
+      boardDiv.innerHTML = boardHTML;
+    });
+  }).catch(function() {
+    // 글로벌 실패 시 로컬 리더보드 표시
+    var boardHTML = '<div class="lb-title">' + t('leaderboardTitle') + '</div>';
+    var top10 = board.slice(0, 10);
+    for (var i = 0; i < top10.length; i++) {
+      var entry = top10[i];
+      var rankIcon = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1) + '.'));
+      boardHTML += '<div class="lb-row' + (entry.isLatest ? ' lb-me' : '') + '">' +
+        '<span class="lb-rank">' + rankIcon + '</span>' +
+        '<span class="lb-name">' + entry.name + '</span>' +
+        '<span class="lb-asset">' + formatAssetFull(entry.assets) + '</span>' +
+        '</div>';
+    }
+    boardHTML += '<div class="lb-total">' + t('leaderboardTotal').replace('{n}', board.length) + '</div>';
+    boardDiv.innerHTML = boardHTML;
+  });
   narrativeText.appendChild(boardDiv);
 
   // 다시하기 버튼
@@ -1108,10 +1144,12 @@ function showGameResult() {
 }
 
 function formatAssetFull(amount) {
-  if (amount >= 100000000) return (amount / 100000000).toFixed(1) + '억원';
-  if (amount >= 10000) return Math.floor(amount / 10000).toLocaleString() + '만원';
-  if (amount < 0) return '-' + Math.floor(Math.abs(amount) / 10000).toLocaleString() + '만원';
-  return amount.toLocaleString() + '원';
+  var abs = Math.abs(amount);
+  var sign = amount < 0 ? '-' : '';
+  if (abs >= 1000000000000) return sign + (abs / 1000000000000).toFixed(1) + '조원';
+  if (abs >= 100000000) return sign + (abs / 100000000).toFixed(1) + '억원';
+  if (abs >= 10000) return sign + Math.floor(abs / 10000).toLocaleString() + '만원';
+  return sign + abs.toLocaleString() + '원';
 }
 
 function saveToLeaderboard(totalAssets) {

@@ -103,9 +103,12 @@ class GameState {
 
   formatCash() {
     const cash = this.state.assets.cash_krw;
-    if (cash >= 100000000) return (cash / 100000000).toFixed(1) + '억원';
-    if (cash >= 10000) return Math.floor(cash / 10000) + '만원';
-    return cash.toLocaleString() + '원';
+    const abs = Math.abs(cash);
+    const sign = cash < 0 ? '-' : '';
+    if (abs >= 1000000000000) return sign + (abs / 1000000000000).toFixed(1) + '조원';
+    if (abs >= 100000000) return sign + (abs / 100000000).toFixed(1) + '억원';
+    if (abs >= 10000) return sign + Math.floor(abs / 10000).toLocaleString() + '만원';
+    return sign + abs.toLocaleString() + '원';
   }
 
   formatTotalAssets() {
