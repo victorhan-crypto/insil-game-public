@@ -4,6 +4,8 @@ const I18N = {
   ko: {
     // 시작 화면
     apiLabel: 'Gemini API Key',
+    nameLabel: '닉네임',
+    namePlaceholder: '닉네임을 입력하세요',
     apiPlaceholder: 'AIza...',
     apiHint: 'Google AI Studio에서 발급받은 키를 입력하세요.',
     startBtn: '게임 시작',
@@ -75,6 +77,8 @@ const I18N = {
   },
   en: {
     apiLabel: 'Gemini API Key',
+    nameLabel: 'Nickname',
+    namePlaceholder: 'Enter your nickname',
     apiPlaceholder: 'AIza...',
     apiHint: 'Enter your key from Google AI Studio.',
     startBtn: 'Start Game',
@@ -135,6 +139,8 @@ const I18N = {
   },
   ja: {
     apiLabel: 'Gemini APIキー',
+    nameLabel: 'ニックネーム',
+    namePlaceholder: 'ニックネームを入力',
     apiPlaceholder: 'AIza...',
     apiHint: 'Google AI Studioで取得したキーを入力してください。',
     startBtn: 'ゲーム開始',
@@ -209,8 +215,12 @@ function setLang(lang) {
 
 function applyI18n() {
   // 시작 화면
-  var apiLabel = document.querySelector('.api-setup label');
+  var apiLabel = document.querySelector('.api-setup label:nth-of-type(2)');
   if (apiLabel) apiLabel.textContent = t('apiLabel');
+  var nameLabel = document.querySelector('.api-setup label:first-of-type');
+  if (nameLabel) nameLabel.textContent = t('nameLabel');
+  var nameInput = document.getElementById('player-name');
+  if (nameInput) nameInput.placeholder = t('namePlaceholder');
   var apiInput = document.getElementById('gemini-key');
   if (apiInput) apiInput.placeholder = t('apiPlaceholder');
   var hint = document.querySelector('.hint');

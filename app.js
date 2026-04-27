@@ -93,6 +93,11 @@ function startGame() {
     return;
   }
 
+  // 닉네임 저장
+  var playerName = (document.getElementById('player-name').value || '').trim();
+  if (!playerName) playerName = '익명' + Math.floor(Math.random() * 9999);
+  localStorage.setItem('imf_player_name', playerName);
+
   localStorage.setItem('imf_gemini_key', geminiKey);
   apiClient = new APIClient(geminiKey);
   gameState = new GameState();
@@ -1116,7 +1121,7 @@ function saveToLeaderboard(totalAssets) {
   // 새 기록 추가
   var playNum = board.length + 1;
   board.push({
-    name: t('playerLabel').replace('{n}', playNum),
+    name: localStorage.getItem('imf_player_name') || t('playerLabel').replace('{n}', playNum),
     assets: totalAssets,
     date: new Date().toISOString().slice(0, 10),
     isLatest: true
@@ -1141,4 +1146,6 @@ function getMyRank(totalAssets, board) {
 window.addEventListener('load', () => {
   const savedKey = localStorage.getItem('imf_gemini_key');
   if (savedKey) document.getElementById('gemini-key').value = savedKey;
+  const savedName = localStorage.getItem('imf_player_name');
+  if (savedName) document.getElementById('player-name').value = savedName;
 });
