@@ -813,6 +813,14 @@ function dynamicSituation(text) {
     result = result.replace(/포항제철/g, '주식');
   }
 
+  // intervention 텍스트의 "통장에 있다" 금액을 실제 현금으로 치환
+  var cashText = gameState.formatCash();
+  // "200만원이 통장에 있다" → "164만원이 통장에 있다"
+  result = result.replace(/\d+만원이 통장에/g, cashText + '이 통장에');
+  // "통장에 돈이 있다" 패턴
+  result = result.replace(/통장에 \d+만원/g, '통장에 ' + cashText);
+  // "통장에 돈이 있다" — 금액 없는 경우는 그대로
+
   return result;
 }
 
