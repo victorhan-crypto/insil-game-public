@@ -358,13 +358,24 @@ function calculateStateLocal(action, state, year, month) {
     narrative_hints: { tone: 'neutral', details: action }
   };
 
+  // ═══ 자동 대출 헬퍼 — 현금 부족 시 부족분만큼 대출 ═══
+  function autoLoan(needed, currentCash) {
+    var shortage = needed - currentCash;
+    if (shortage <= 0) return null; // 대출 불필요
+    // 은행원이면 은행 대출 (연 8%), 아니면 사채 (연 24%)
+    var job = state.stats.job || '';
+    var isBank = (job === 'banker' || job === 'securities');
+    var source = isBank ? '은행대출' : '사채';
+    var rate = isBank ? 8 : 24;
+    return { source: source, amount: shortage, rate: rate };
+  }
   const cash = state.assets.cash_krw;
 
   switch (parsed.type) {
     case 'BUY_USD': {
-      var amt = parsed.amount || Math.floor(cash * 0.5);
-      if (amt <= 0 || cash <= 0) { result.action_valid = false; result.rejection_reason = '환전할 현금이 없습니다.'; break; }
-      if (amt > cash) amt = cash;
+      var amt = parsed.amount || Math.floor(cash > 0 ? cash * 0.5 : 1000000);
+      if (amt <= 0) amt = 1000000;
+      if (amt > cash) amt = cash > 0 ? cash : amt; // 자동대출은 아래에서 처리
       const rate = getExchangeRate(year, month);
       const usd = Math.floor(amt / rate);
       result.state_changes.assets = { cash_krw: -amt, usd: usd, usd_buy_rate: rate };
@@ -388,13 +399,9 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_GOLD': {
-      var amt = parsed.amount || Math.floor(cash * 0.5);
-      if (amt <= 0 || cash <= 0) {
-        result.action_valid = false;
-        result.rejection_reason = amt <= 0 ? '투자할 현금이 없습니다.' : '현금이 부족합니다.';
-        break;
-      }
-      if (amt > cash) amt = cash;
+      var amt = parsed.amount || Math.floor(cash > 0 ? cash * 0.5 : 1000000);
+      if (amt <= 0) amt = 1000000;
+      if (amt > cash) amt = cash > 0 ? cash : amt;
       const goldPrice = getGoldPrice(year);
       const goldGrams = Math.floor(amt / goldPrice);
       var goldRemaining = cash - amt;
@@ -1102,6 +1109,41 @@ function calculateStateLocal(action, state, year, month) {
         result.state_changes.assets.cash_krw = (result.state_changes.assets.cash_krw || 0) - trap.cost;
       }
       result.asset_summary = (result.asset_summary || '') + ' | ' + trap.message;
+    }
+  }
+
+  // ═══ 자동 대출 시스템 — 현금이 마이너스가 되면 자동으로 대출 ═══
+  var cashChange = result.state_changes.assets.cash_krw || 0;
+  var projectedCash = cash + cashChange;
+  if (projectedCash < 0 && result.action_valid !== false) {
+    var shortage = Math.abs(projectedCash) + 100000; // 10만원 여유
+    var loan = autoLoan(shortage, 0);
+    if (loan) {
+      // 기존 부채에 추가
+      if (!result.state_changes.assets.debt) {
+        result.state_changes.assets.debt = loan;
+      }
+      // 현금에 대출금 추가
+      result.state_changes.assets.cash_krw = cashChange + loan.amount;
+      result.asset_summary = (result.asset_summary || '') + ' | ' + loan.source + ' ' + Math.floor(loan.amount/10000) + '만원 차입 (연 ' + loan.rate + '%)';
+      result.narrative_hints.loanTaken = true;
+    }
+  }
+
+  // 거절된 행동도 현금 부족이 이유면 자동 대출로 재시도
+  if (result.action_valid === false && result.rejection_reason && /현금|부족|계약금|등록금|학비/.test(result.rejection_reason)) {
+    // 거절 해제하고 자동 대출 적용
+    result.action_valid = true;
+    result.rejection_reason = null;
+    // 필요 금액 추정
+    var neededMatch = result.rejection_reason_amount || parsed.amount || 5000000;
+    var loan2 = autoLoan(neededMatch, cash);
+    if (loan2) {
+      result.state_changes.assets.cash_krw = (result.state_changes.assets.cash_krw || 0) + loan2.amount;
+      if (!result.state_changes.assets.debt) {
+        result.state_changes.assets.debt = loan2;
+      }
+      result.asset_summary = (result.asset_summary || '') + loan2.source + ' ' + Math.floor(loan2.amount/10000) + '만원 차입 (연 ' + loan2.rate + '%)';
     }
   }
 
