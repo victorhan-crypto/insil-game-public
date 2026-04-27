@@ -94,6 +94,8 @@ function parseAction(text, state) {
 
   // ═══ 금액 추출 ═══
   let amount = 0;
+  // "모두", "전부", "전액", "올인" → 전액 투자 플래그
+  var isAllIn = /모두|전부|전액|올인|다 넣|다 투자|전재산|있는 돈/.test(t);
   // "200만원", "50 만원", "1000만원"
   const manwonMatch = t.match(/(\d+)\s*만\s*원/);
   // "200만" (원 없이)
@@ -106,6 +108,10 @@ function parseAction(text, state) {
   else if (manMatch) amount = parseInt(manMatch[1]) * 10000;
   else if (wonMatch) amount = parseInt(wonMatch[1]);
   if (eokMatch) amount += parseInt(eokMatch[1]) * 100000000;
+  // 전액 투자 시 현금 전액
+  if (isAllIn && amount === 0 && state && state.assets) {
+    amount = state.assets.cash_krw || 0;
+  }
 
   // 달러 금액
   const dollarMatch = t.match(/(\d+)\s*달러/) || t.match(/(\d+)\s*\$/);
@@ -629,14 +635,17 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_FUND': {
-      var fundAmt = parsed.amount || Math.floor(cash > 0 ? cash * 0.5 : 1000000);
+      var fundAmt = parsed.amount || (cash > 0 ? cash : 1000000);
       if (fundAmt <= 0) fundAmt = 1000000;
       var isChinaFund = action.includes('중국');
       var fundName = isChinaFund ? '중국펀드' : '국내펀드';
-      // 펀드 수익률: 시기에 따라 다름
-      var fundReturn = { 1999:0.35, 2000:-0.25, 2001:-0.10, 2002:0.05, 2003:0.15, 2004:0.10, 2005:0.20, 2006:0.30, 2007:0.15 };
-      if (isChinaFund) fundReturn = { 2005:0.45, 2006:0.55, 2007:0.40, 2008:-0.50 };
+      // 펀드 수익률: 시기에 따라 다름 — 하이리스크 하이리턴
+      var fundReturn = { 1999:0.50, 2000:-0.40, 2001:-0.15, 2002:0.08, 2003:0.20, 2004:0.15, 2005:0.30, 2006:0.40, 2007:0.20 };
+      if (isChinaFund) fundReturn = { 2005:0.80, 2006:1.00, 2007:0.60, 2008:-0.65 };
       var expectedReturn = fundReturn[year] || 0.05;
+      // 랜덤 변동 ±30%
+      var volatility = 1 + (Math.random() - 0.5) * 0.6;
+      expectedReturn = expectedReturn * volatility;
       var fundGain = Math.floor(fundAmt * expectedReturn);
       result.state_changes.assets = { cash_krw: -fundAmt + fundGain };
       result.asset_summary = fundName + ' ' + Math.floor(fundAmt/10000) + '만원 투자 → 수익 ' + (fundGain >= 0 ? '+' : '') + Math.floor(fundGain/10000) + '만원 (' + Math.round(expectedReturn*100) + '%)';
