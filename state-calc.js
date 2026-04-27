@@ -63,7 +63,7 @@ function getIndex(data, year, month) {
     if (months[i] <= month) closest = months[i];
   }
   var base = yearData[closest];
-  var variation = 1 + (Math.random() - 0.5) * 0.1;
+  var variation = 1 + (Math.random() - 0.5) * 0.4;
   return Math.round(base * variation);
 }
 
@@ -76,8 +76,8 @@ function getExchangeRate(year, month) {
     if (m <= month) closest = m;
   }
   const base = yearData[closest];
-  // ±5% 랜덤 변동
-  const variation = 1 + (Math.random() - 0.5) * 0.1;
+  // ±15% 랜덤 변동
+  const variation = 1 + (Math.random() - 0.5) * 0.3;
   return Math.round(base * variation);
 }
 
@@ -364,15 +364,22 @@ function calculateStateLocal(action, state, year, month) {
     narrative_hints: { tone: 'neutral', details: action }
   };
 
-  // ═══ 자동 대출 헬퍼 — 현금 부족 시 부족분만큼 대출 ═══
+  // ═══ 자동 대출 헬퍼 — 현금 부족 시 부족분만큼 대출 (한도 없음) ═══
   function autoLoan(needed, currentCash) {
     var shortage = needed - currentCash;
-    if (shortage <= 0) return null; // 대출 불필요
-    // 은행원이면 은행 대출 (연 8%), 아니면 사채 (연 24%)
+    if (shortage <= 0) return null;
+    // 직업에 따라 대출 조건이 다름
     var job = state.stats.job || '';
-    var isBank = (job === 'banker' || job === 'securities');
-    var source = isBank ? '은행대출' : '사채';
-    var rate = isBank ? 8 : 24;
+    var source, rate;
+    if (job === 'banker' || job === 'securities') {
+      source = '은행대출'; rate = 6;
+    } else if (job === 'business' || job === 'manseok_employee') {
+      source = '사업자대출'; rate = 8;
+    } else if (shortage > 50000000) {
+      source = '담보대출'; rate = 7;
+    } else {
+      source = '신용대출'; rate = 12;
+    }
     return { source: source, amount: shortage, rate: rate };
   }
   const cash = state.assets.cash_krw;
@@ -488,14 +495,9 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_REALESTATE': {
-      // 시대별 기본 집값 (금액 미지정 시)
-      var defaultPrice = { 1999:50000000, 2000:60000000, 2001:70000000, 2002:80000000, 2003:100000000, 2004:120000000, 2005:150000000, 2006:200000000, 2007:250000000 };
+      // 시대별 기본 집값 (금액 미지정 시) — 서울 기준
+      var defaultPrice = { 1997:30000000, 1998:25000000, 1999:35000000, 2000:50000000, 2001:60000000, 2002:80000000, 2003:100000000, 2004:150000000, 2005:200000000, 2006:300000000, 2007:400000000 };
       var reAmt = parsed.amount || defaultPrice[year] || 100000000;
-      if (state.player.age < 20) {
-        result.action_valid = false;
-        result.rejection_reason = '아직 부동산을 살 수 있는 나이가 아닙니다.';
-        break;
-      }
       // 대출 비율 — 플레이어가 대출을 언급하면 자기자본 10%, 아니면 30%
       var mentionsLoan = /대출|담보|융자|빌려|빌린|레버리지/.test(action);
       var downRatio = mentionsLoan ? 0.1 : 0.3;
@@ -524,7 +526,7 @@ function calculateStateLocal(action, state, year, month) {
       }
       var prop = reList[0];
       // 시세 변동 적용 (연도별 상승률)
-      var reGrowth = { 2000:0.95, 2001:1.02, 2002:1.15, 2003:1.05, 2004:1.12, 2005:1.18, 2006:1.15, 2007:1.08 };
+      var reGrowth = { 2000:0.90, 2001:1.05, 2002:1.25, 2003:1.10, 2004:1.30, 2005:1.40, 2006:1.35, 2007:1.20 };
       var currentValue = prop.buyPrice;
       for (var y = prop.buyYear + 1; y <= year; y++) {
         currentValue = Math.floor(currentValue * (reGrowth[y] || 1.03));
@@ -579,7 +581,7 @@ function calculateStateLocal(action, state, year, month) {
         break;
       }
       var bld = bldList[0];
-      var bldGrowth = { 2000:0.98, 2001:1.03, 2002:1.08, 2003:1.05, 2004:1.10, 2005:1.15, 2006:1.12, 2007:1.06 };
+      var bldGrowth = { 2000:0.95, 2001:1.05, 2002:1.15, 2003:1.08, 2004:1.20, 2005:1.30, 2006:1.25, 2007:1.15 };
       var bldValue = bld.buyPrice;
       for (var by = bld.buyYear + 1; by <= year; by++) {
         bldValue = Math.floor(bldValue * (bldGrowth[by] || 1.03));
@@ -639,12 +641,12 @@ function calculateStateLocal(action, state, year, month) {
       if (fundAmt <= 0) fundAmt = 1000000;
       var isChinaFund = action.includes('중국');
       var fundName = isChinaFund ? '중국펀드' : '국내펀드';
-      // 펀드 수익률: 시기에 따라 다름 — 하이리스크 하이리턴
-      var fundReturn = { 1999:0.50, 2000:-0.40, 2001:-0.15, 2002:0.08, 2003:0.20, 2004:0.15, 2005:0.30, 2006:0.40, 2007:0.20 };
-      if (isChinaFund) fundReturn = { 2005:0.80, 2006:1.00, 2007:0.60, 2008:-0.65 };
-      var expectedReturn = fundReturn[year] || 0.05;
-      // 랜덤 변동 ±30%
-      var volatility = 1 + (Math.random() - 0.5) * 0.6;
+      // 펀드 수익률 — 역사 기반 하이리스크 하이리턴
+      var fundReturn = { 1999:0.80, 2000:-0.55, 2001:-0.20, 2002:0.15, 2003:0.30, 2004:0.25, 2005:0.50, 2006:0.60, 2007:0.35 };
+      if (isChinaFund) fundReturn = { 2005:1.50, 2006:2.00, 2007:1.20, 2008:-0.80 };
+      var expectedReturn = fundReturn[year] || 0.10;
+      // 랜덤 변동 ±50% — 운에 따라 대박 or 쪽박
+      var volatility = 1 + (Math.random() - 0.5) * 1.0;
       expectedReturn = expectedReturn * volatility;
       var fundGain = Math.floor(fundAmt * expectedReturn);
       result.state_changes.assets = { cash_krw: -fundAmt + fundGain };
@@ -814,9 +816,9 @@ function calculateStateLocal(action, state, year, month) {
     case 'LEVERAGE_TRADE': {
       var levAmt = parsed.amount || Math.floor(cash > 0 ? cash * 0.3 : 1000000);
       if (levAmt <= 0) levAmt = 1000000;
-      // 레버리지 3배 — 수익도 3배, 손실도 3배
-      var levMultiplier = 3;
-      var baseReturn = (Math.random() - 0.45) * 0.3; // -13.5% ~ +16.5% 기본 수익률
+      // 레버리지 5배 — 수익도 5배, 손실도 5배. 올인하면 대박 or 파산
+      var levMultiplier = 5;
+      var baseReturn = (Math.random() - 0.42) * 0.4; // -16.8% ~ +23.2% 기본 수익률
       var levReturn = baseReturn * levMultiplier;
       var levGain = Math.floor(levAmt * levReturn);
       // 손실이 증거금 초과 시 강제 청산
