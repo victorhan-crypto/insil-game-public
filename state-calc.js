@@ -85,177 +85,229 @@ function getGoldPrice(year) {
   return GOLD_PRICES[year] || 15000;
 }
 
-// 플레이어 입력을 분석해서 행동 유형과 금액을 추출
+
 function parseAction(text, state) {
   const t = text.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
-  // 부정어 감지
-  var isNegative = /안 |안한|안해|안낸|안다|안사|안갈|안할|하지 않|하지않|포기|거절|싫|안 할|안 사|안 갈|필요없|관두|그만|말자|말아|말고|않겠|않을|안 낼|안낼/.test(t);
+  // ═══ 부정어 감지 ═══
+  var isNegative = /안 |안한|안해|안낸|안다|안사|안갈|안할|하지 않|하지않|포기|거절|싫|안 할|안 사|안 갈|필요없|관두|그만|말자|말아|말고|않겠|않을|안 낼|안낼|거부|됐다|됐어|필요 없/.test(t);
 
-  // 금액 추출 (만원, 원)
+  // ═══ 금액 추출 ═══
   let amount = 0;
+  // "200만원", "50 만원", "1000만원"
   const manwonMatch = t.match(/(\d+)\s*만\s*원/);
+  // "200만" (원 없이)
+  const manMatch = t.match(/(\d+)\s*만(?!\s*원)/);
+  // "30000원", "5000원"
   const wonMatch = t.match(/(\d+)\s*원/);
+  // "1억", "2억5천"
+  const eokMatch = t.match(/(\d+)\s*억/);
   if (manwonMatch) amount = parseInt(manwonMatch[1]) * 10000;
+  else if (manMatch) amount = parseInt(manMatch[1]) * 10000;
   else if (wonMatch) amount = parseInt(wonMatch[1]);
+  if (eokMatch) amount += parseInt(eokMatch[1]) * 100000000;
 
   // 달러 금액
-  const dollarMatch = t.match(/(\d+)\s*달러/);
+  const dollarMatch = t.match(/(\d+)\s*달러/) || t.match(/(\d+)\s*\$/);
   let dollarAmount = dollarMatch ? parseInt(dollarMatch[1]) : 0;
 
-  // "현금으로 바꿔", "원화로 환전" → 달러 매도
-  if ((t.includes('현금') || t.includes('원화')) && (t.includes('바꾸') || t.includes('환전') || t.includes('바꿔'))) {
-    return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+  // ═══ 공통 동사 패턴 ═══
+  var BUY = /산다|사자|사겠|사려|사볼|사둘|사둬|사놓|사놔|사요|삽니다|매수|매입|구매|구입|투자|들어가|넣|사 |살래|살게|살거|좀 사|에 사|을 사|를 사/.test(t);
+  var SELL = /판다|팔자|팔겠|팔아|팔려|팔아야|팔까|매도|매각|처분|정리|빼|뺀다|빼자|현금화|팔 |팔래|팔게|팔거|다 팔|전부 팔|모두 팔/.test(t);
+  var GIVE = /준다|줘|줬|줄게|줄래|드린|드렸|드려|드릴|보낸|보내|보냈|건넨|건네|전달|지원|후원|대신|대납|내준|내줬|내줄|갚아줬|갚아줄|갚아드|도와|도왔|돕/.test(t);
+  var PAY = /낸다|냈|내|낼|지불|지출|결제|납부|쓴다|썼|쓸|쓸게|소비|사용|지급|치른|치르|치룬/.test(t);
+  var BORROW_V = /빌린|빌려|빌렸|빌릴|대출|융자|꿔|꾸|꿨|차입/.test(t);
+  var REPAY_V = /갚|상환|변제|청산|탕감|완납|돌려줬|돌려줄|돌려준|되갚/.test(t);
+
+  // ═══ 1. 달러 거래 ═══
+  if (t.includes('달러') || t.includes('$') || t.includes('환전') || t.includes('외화')) {
+    // 매도 우선 체크
+    if (SELL || t.includes('현금으로') || t.includes('원화로') || /모두|전부|다 /.test(t)) {
+      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+    }
+    if (BUY || t.includes('바꾸') || t.includes('바꿔') || (t.includes('달러로') && t.includes('환전'))) {
+      return { type: 'BUY_USD', amount };
+    }
+    // "환전" 단독 → 보유 달러 있으면 매도, 없으면 매수
+    if (t.includes('환전')) {
+      if (state && state.assets && state.assets.usd > 0) return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+      return { type: 'BUY_USD', amount };
+    }
   }
 
-  // 행동 분류 — SELL을 BUY보다 먼저 체크 (환전 = 매도 우선)
-  if (t.includes('달러') && (t.includes('판다') || t.includes('팔') || t.includes('매도') || t.includes('현금') || t.includes('모두') || t.includes('전부') || t.includes('다 '))) {
-    return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+  // ═══ 2. 금 거래 ═══
+  if ((t.includes('금') && !t.includes('등록금') && !t.includes('현금') && !t.includes('세금') && !t.includes('금리') && !t.includes('금모으기') && !t.includes('금융')) ||
+      t.includes('골드') || t.includes('금은방')) {
+    if (SELL) return { type: 'SELL_GOLD', amount };
+    if (BUY || GIVE || PAY) return { type: 'BUY_GOLD', amount };
   }
-  if (t.includes('달러') && (t.includes('산다') || t.includes('사') || t.includes('매수') || t.includes('바꾸'))) {
-    if (t.includes('환전') && !t.includes('으로')) {
-      // "달러로 환전" = 매수, "달러 환전" = 매도 (모호하면 매도 우선)
-      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+
+  // ═══ 3. 주식 거래 ═══
+  if (t.includes('주식') || t.includes('코스피') || t.includes('코스닥') ||
+      t.includes('삼성') || t.includes('포항') || t.includes('현대') || t.includes('sk') || t.includes('lg') ||
+      t.includes('종목') || t.includes('증시')) {
+    if (SELL) return { type: 'SELL_STOCK', amount };
+    if (BUY) return { type: 'BUY_STOCK', amount };
+  }
+
+  // ═══ 4. 펀드 거래 ═══
+  if (t.includes('펀드') || t.includes('적립식') || t.includes('인덱스')) {
+    if (SELL || /해지|환매/.test(t)) return { type: 'SELL_FUND', amount };
+    if (BUY || /가입|들어|넣/.test(t)) return { type: 'BUY_FUND', amount };
+  }
+
+  // ═══ 5. 부동산 거래 ═══
+  if (t.includes('부동산') || t.includes('아파트') || t.includes('집') || t.includes('전세') || t.includes('월세') || t.includes('매물')) {
+    if (SELL) return { type: 'SELL_REALESTATE', amount };
+    if (BUY || /계약|잡/.test(t)) return { type: 'BUY_REALESTATE', amount };
+  }
+
+  // ═══ 6. 건물 거래 ═══
+  if (t.includes('건물') || t.includes('상가') || t.includes('오피스텔') || t.includes('빌딩') || t.includes('임대')) {
+    if (SELL) return { type: 'SELL_BUILDING', amount };
+    if (BUY || /계약|잡/.test(t)) return { type: 'BUY_BUILDING', amount };
+  }
+
+  // ═══ 7. 사업체 거래 ═══
+  if (t.includes('회사') || t.includes('업체') || t.includes('가게') || t.includes('사업체') || t.includes('인수') || t.includes('창업') || t.includes('사업')) {
+    if (SELL || /정리|폐업|접/.test(t)) return { type: 'SELL_BUSINESS', amount };
+    if (BUY || /인수|시작|차린|차려|열/.test(t)) return { type: 'BUY_BUSINESS', amount };
+  }
+
+  // ═══ 8. 대출/차입 ═══
+  if (BORROW_V || (t.includes('사채') && !REPAY_V && !GIVE)) {
+    if (t.includes('사채') || t.includes('대출') || t.includes('돈') || amount > 0) {
+      return { type: 'BORROW', amount };
     }
-    return { type: 'BUY_USD', amount };
   }
-  if (t.includes('달러') && t.includes('환전')) {
-    // "달러 환전" 단독 = 보유 달러를 현금으로 (매도)
-    if (state && state.assets && state.assets.usd > 0) {
-      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
-    }
-    return { type: 'BUY_USD', amount };
-  }
-  if (t.includes('금') && (t.includes('산다') || t.includes('사') || t.includes('매수'))) {
-    return { type: 'BUY_GOLD', amount };
-  }
-  if (t.includes('금') && (t.includes('판다') || t.includes('팔') || t.includes('매도'))) {
-    return { type: 'SELL_GOLD', amount };
-  }
-  if (t.includes('예금') || t.includes('저축') || t.includes('넣') || t.includes('적금')) {
-    return { type: 'DEPOSIT', amount };
-  }
-  if (t.includes('주식') && (t.includes('산다') || t.includes('사') || t.includes('매수'))) {
-    return { type: 'BUY_STOCK', amount };
-  }
-  if (t.includes('주식') && (t.includes('판다') || t.includes('팔') || t.includes('매도'))) {
-    return { type: 'SELL_STOCK', amount };
-  }
-  if ((t.includes('사채') && (t.includes('빌린다') || t.includes('빌려') || t.includes('쓴다'))) || 
-      (t.includes('빌린다') && t.includes('돈')) || 
-      (t.includes('대출') && (t.includes('받') || t.includes('신청')))) {
-    return { type: 'BORROW', amount };
-  }
-  if ((t.includes('갚') || t.includes('상환')) && (t.includes('만원') || t.includes('돈') || t.includes('빚') || t.includes('사채'))) {
+
+  // ═══ 9. 빚 상환 ═══
+  if (REPAY_V && (t.includes('빚') || t.includes('사채') || t.includes('대출') || t.includes('이자') || amount > 0)) {
     return { type: 'REPAY', amount };
   }
-  // "아버지 사채 대신 갚아드린다" 등 가족 빚 대납
-  if ((t.includes('아버지') || t.includes('아빠')) && (t.includes('사채') || t.includes('빚')) && amount > 0) {
-    return { type: 'SUPPORT_FAMILY', amount, target: 'father' };
+
+  // ═══ 10. 가족 빚 대납 (아버지 사채 등) ═══
+  if (/아버지|아빠/.test(t) && /사채|빚/.test(t) && (amount > 0 || GIVE || PAY || REPAY_V)) {
+    return { type: 'SUPPORT_FAMILY', amount: amount || 500000, target: 'father' };
   }
-  if ((t.includes('부동산') || t.includes('아파트') || t.includes('집')) && (t.includes('산다') || t.includes('사') || t.includes('매수') || t.includes('계약'))) {
-    return { type: 'BUY_REALESTATE', amount };
+
+  // ═══ 11. 예금/저축 ═══
+  if (t.includes('예금') || t.includes('저축') || t.includes('적금') || t.includes('은행에 넣') || t.includes('통장에 넣') || t.includes('맡기') || t.includes('맡긴')) {
+    return { type: 'DEPOSIT', amount };
   }
-  if ((t.includes('부동산') || t.includes('아파트') || t.includes('집')) && (t.includes('판다') || t.includes('팔') || t.includes('매도'))) {
-    return { type: 'SELL_REALESTATE', amount };
+
+  // ═══ 12. 레버리지/파생 ═══
+  if ((t.includes('선물') && t.includes('옵션')) || t.includes('레버리지') || t.includes('공매도') || t.includes('마진') || t.includes('선물거래') || t.includes('파생')) {
+    return { type: 'LEVERAGE_TRADE', amount };
   }
-  if ((t.includes('건물') || t.includes('상가') || t.includes('오피스텔') || t.includes('빌딩')) && (t.includes('산다') || t.includes('사') || t.includes('매수') || t.includes('계약'))) {
-    return { type: 'BUY_BUILDING', amount };
-  }
-  if ((t.includes('건물') || t.includes('상가') || t.includes('오피스텔') || t.includes('빌딩')) && (t.includes('판다') || t.includes('팔') || t.includes('매도'))) {
-    return { type: 'SELL_BUILDING', amount };
-  }
-  if ((t.includes('회사') || t.includes('업체') || t.includes('가게') || t.includes('인수') || t.includes('사업체')) && (t.includes('산다') || t.includes('사') || t.includes('인수') || t.includes('매수'))) {
-    return { type: 'BUY_BUSINESS', amount };
-  }
-  if ((t.includes('회사') || t.includes('업체') || t.includes('가게') || t.includes('사업체')) && (t.includes('판다') || t.includes('팔') || t.includes('매도') || t.includes('정리'))) {
-    return { type: 'SELL_BUSINESS', amount };
-  }
-  if ((t.includes('펀드') || t.includes('적립식')) && (t.includes('산다') || t.includes('사') || t.includes('가입') || t.includes('넣'))) {
-    return { type: 'BUY_FUND', amount };
-  }
-  if ((t.includes('펀드') || t.includes('적립식')) && (t.includes('판다') || t.includes('팔') || t.includes('해지') || t.includes('환매'))) {
-    return { type: 'SELL_FUND', amount };
-  }
-  if ((t.includes('삼성') || t.includes('포항') || t.includes('현대') || t.includes('sk') || t.includes('lg')) && (t.includes('산다') || t.includes('사') || t.includes('매수'))) {
-    return { type: 'BUY_STOCK', amount };
-  }
-  if (t.includes('학원') || t.includes('등록금') || t.includes('학비')) {
+
+  // ═══ 13. 교육비 ═══
+  if (t.includes('학원') || t.includes('등록금') || t.includes('학비') || t.includes('수업료') || t.includes('과외')) {
     if (isNegative) return { type: 'NONE', amount: 0 };
     return { type: 'SPEND_EDUCATION', amount: amount || 300000 };
   }
-  if (t.includes('선물') || t.includes('사줘') || t.includes('사준다') || t.includes('핸드크림') || t.includes('양말') || t.includes('구두')) {
+
+  // ═══ 14. 선물/기프트 ═══
+  if (/선물|사줘|사준|사줬|핸드크림|양말|구두|꽃|케이크|반지|목걸이|시계/.test(t) && !t.includes('옵션')) {
     return { type: 'SPEND_GIFT', amount: amount || 30000 };
   }
-  if (t.includes('알바') || t.includes('일한다') || t.includes('취직')) {
+
+  // ═══ 15. 일/취직 ═══
+  if (/알바|아르바이트|일한|일할|일하겠|취직|취업|입사|출근|일자리|파트타임|편의점/.test(t)) {
     return { type: 'WORK', amount: 0 };
   }
-  // ═══ 새 자유도 ═══
-  if ((t.includes('조만석') || t.includes('딜')) && (t.includes('수락') || t.includes('받아들') || t.includes('하겠') || t.includes('같이'))) {
-    return { type: 'ACCEPT_DEAL', amount };
+
+  // ═══ 16. 조만석 딜 ═══
+  if (/조만석|딜|제안/.test(t)) {
+    if (/수락|받아들|하겠|같이|좋|오케이|ok|응|그래|알겠|동의|합류/.test(t)) {
+      return { type: 'ACCEPT_DEAL', amount };
+    }
+    if (isNegative || /거절|거부|안 한|싫|됐/.test(t)) {
+      return { type: 'REJECT_DEAL', amount: 0 };
+    }
   }
-  if ((t.includes('조만석') || t.includes('딜')) && (t.includes('거절') || t.includes('안 한다') || t.includes('거부') || t.includes('싫'))) {
-    return { type: 'REJECT_DEAL', amount: 0 };
-  }
-  if (t.includes('이직') || t.includes('전직') || t.includes('옮기') || t.includes('증권사') || t.includes('그만두')) {
+
+  // ═══ 17. 이직 ═══
+  if (/이직|전직|옮기|증권사|그만두|그만둘|퇴사|퇴직|사표|사직/.test(t)) {
     return { type: 'CHANGE_JOB', amount: 0 };
   }
-  if ((t.includes('승연') || t.includes('은지') || t.includes('어머니') || t.includes('엄마') || t.includes('아버지') || t.includes('아빠')) && (t.includes('등록금') || t.includes('생활비') || t.includes('병원비') || t.includes('도와') || t.includes('보내') || t.includes('드린') || t.includes('드렸') || t.includes('드려') || t.includes('줬') || t.includes('줘') || t.includes('준다') || t.includes('줄게') || t.includes('낸다') || t.includes('내') || t.includes('갚'))) {
-    return { type: 'SUPPORT_FAMILY', amount: amount || 500000, target: extractTarget(t) };
+
+  // ═══ 18. 가족 금전 지원 (넓은 패턴) ═══
+  if (/승연|은지|어머니|엄마|아버지|아빠|부모|가족/.test(t) && (GIVE || PAY || REPAY_V || amount > 0)) {
+    // 금액이 있거나 돈 관련 동사가 있으면 → 금전 지원
+    if (/등록금|생활비|병원비|약값|치료비|용돈|밥값|교통비|월세|사채|빚|돈/.test(t) || amount > 0) {
+      return { type: 'SUPPORT_FAMILY', amount: amount || 500000, target: extractTarget(t) };
+    }
   }
-  if ((t.includes('정보') || t.includes('김실장') || t.includes('김 실장')) && (t.includes('산다') || t.includes('사') || t.includes('거래') || t.includes('받'))) {
+
+  // ═══ 19. 정보 거래 ═══
+  if (/정보|김실장|김 실장|내부자|인사이더|첩보/.test(t) && (BUY || /거래|받|구한|구해|얻/.test(t))) {
     return { type: 'BUY_INFO', amount: amount || 1000000 };
   }
-  if (t.includes('보험') && (t.includes('가입') || t.includes('든다') || t.includes('넣'))) {
+
+  // ═══ 20. 보험 ═══
+  if (t.includes('보험') && (BUY || /가입|든다|들겠|들어|넣/.test(t))) {
     return { type: 'BUY_INSURANCE', amount: amount || 300000 };
   }
-  if (t.includes('이사') || t.includes('강남') && t.includes('간다') || t.includes('이사간다')) {
+
+  // ═══ 21. 이사 ═══
+  if (/이사|이사간|이사가|이사할/.test(t) || (t.includes('강남') && /간다|가자|갈|가겠|이전/.test(t))) {
     return { type: 'MOVE', amount: 0 };
   }
-  if (t.includes('유학') || t.includes('자격증') || t.includes('mba') || t.includes('석사') || t.includes('공인회계사') || t.includes('cfa')) {
+
+  // ═══ 22. 공부/자기계발 ═══
+  if (/유학|자격증|mba|석사|박사|공인회계사|cfa|cpa|공부하|배우|수강/.test(t)) {
     return { type: 'STUDY', amount: amount || 5000000 };
   }
-  if (t.includes('선물') && t.includes('옵션') || t.includes('레버리지') || t.includes('공매도') || t.includes('마진') || t.includes('선물거래')) {
-    return { type: 'LEVERAGE_TRADE', amount };
+
+  // ═══ 23. 동준 관계 ═══
+  if (t.includes('동준')) {
+    if (/용서|화해|받아|괜찮|이해|만나|봐줄|봐줘/.test(t)) return { type: 'FORGIVE_DONGJUN', amount: 0 };
+    if (isNegative || /거절|안 만|끊|절교|무시/.test(t)) return { type: 'REJECT_DONGJUN', amount: 0 };
   }
-  // ═══ 관계/인생 선택 자유도 ═══
-  if (t.includes('동준') && (t.includes('용서') || t.includes('화해') || t.includes('받아') || t.includes('괜찮'))) {
-    return { type: 'FORGIVE_DONGJUN', amount: 0 };
-  }
-  if (t.includes('동준') && (t.includes('거절') || t.includes('안 만') || t.includes('끊') || t.includes('절교'))) {
-    return { type: 'REJECT_DONGJUN', amount: 0 };
-  }
-  if ((t.includes('아버지') || t.includes('아빠')) && (t.includes('말한다') || t.includes('고백') || t.includes('사실') || t.includes('진실') || t.includes('알려'))) {
+
+  // ═══ 24. 아버지에게 진실 고백 ═══
+  if (/아버지|아빠/.test(t) && /말한|고백|사실|진실|알려|얘기|이야기|털어놓|솔직/.test(t)) {
     return { type: 'CONFESS_FATHER', amount: 0 };
   }
-  if (t.includes('승연') && (t.includes('조현우') || t.includes('현우')) && (t.includes('말한다') || t.includes('알려') || t.includes('사실') || t.includes('진실'))) {
+
+  // ═══ 25. 승연에게 진실 알림 ═══
+  if (t.includes('승연') && /조현우|현우/.test(t) && /말한|알려|사실|진실|얘기|이야기|경고|조심/.test(t)) {
     return { type: 'TELL_SEUNGYEON', amount: 0 };
   }
-  if ((t.includes('재수') || t.includes('대학')) && (t.includes('안') || t.includes('포기') || t.includes('그만'))) {
-    return { type: 'SKIP_COLLEGE', amount: 0 };
+
+  // ═══ 26. 대학/재수 ═══
+  if (/재수|대학|수능|입시/.test(t)) {
+    if (isNegative || /포기|그만|안 |않/.test(t)) return { type: 'SKIP_COLLEGE', amount: 0 };
+    if (/한다|간다|가겠|결심|도전|준비|합격/.test(t)) return { type: 'GO_COLLEGE', amount: 0 };
   }
-  if ((t.includes('재수') || t.includes('대학')) && (t.includes('한다') || t.includes('간다') || t.includes('가겠') || t.includes('결심'))) {
-    return { type: 'GO_COLLEGE', amount: 0 };
-  }
-  if (t.includes('아버지') || t.includes('어머니') || t.includes('엄마') || t.includes('아빠') || t.includes('승연')) {
+
+  // ═══ 27. 가족 대화 (금전 아닌 경우) ═══
+  if (/아버지|어머니|엄마|아빠|승연|부모/.test(t)) {
     return { type: 'SOCIAL_FAMILY', amount: 0, target: extractTarget(t) };
   }
-  if (t.includes('은지') || t.includes('동준')) {
+
+  // ═══ 28. 친구 대화 ═══
+  if (/은지|동준/.test(t)) {
     return { type: 'SOCIAL_FRIEND', amount: 0, target: extractTarget(t) };
   }
-  if (t.includes('신문') || t.includes('읽') || t.includes('공부') || t.includes('조사')) {
+
+  // ═══ 29. 정보 수집 ═══
+  if (/신문|읽|공부|조사|뉴스|경제|분석|찾아|알아|검색|리서치/.test(t)) {
     return { type: 'INFO', amount: 0 };
   }
-  if (t.includes('아무것도') || t.includes('넘어') || t.includes('잔다') || t.includes('기다')) {
+
+  // ═══ 30. 아무것도 안 함 ═══
+  if (/아무것도|넘어|잔다|기다|가만|지켜|관망|패스|스킵|넘기/.test(t)) {
     return { type: 'NONE', amount: 0 };
   }
 
-  // 돈을 쓰는 행동 (일반)
-  if (amount > 0 && (t.includes('낸다') || t.includes('내') || t.includes('쓴다') || t.includes('준다') || t.includes('줘') || t.includes('보낸다'))) {
+  // ═══ 31. 일반 지출 (금액 + 지출 동사) ═══
+  if (amount > 0 && (PAY || GIVE)) {
     return { type: 'SPEND', amount };
   }
 
-  // 분류 불가 → 대화/행동으로 처리
+  // ═══ 32. 분류 불가 → 대화/행동 ═══
   return { type: 'SOCIAL', amount: 0 };
 }
 
