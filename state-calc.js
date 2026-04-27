@@ -470,9 +470,9 @@ function calculateStateLocal(action, state, year, month) {
     case 'BUY_REALESTATE': {
       var reAmt = parsed.amount || 0;
       if (reAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      if (year < 2000) {
+      if (state.player.age < 20) {
         result.action_valid = false;
-        result.rejection_reason = '아직 부동산을 살 수 있는 상황이 아닙니다.';
+        result.rejection_reason = '아직 부동산을 살 수 있는 나이가 아닙니다.';
         break;
       }
       // 자기자본 30% + 대출 70% 구조
