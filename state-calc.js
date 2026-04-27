@@ -86,7 +86,7 @@ function getGoldPrice(year) {
 }
 
 // 플레이어 입력을 분석해서 행동 유형과 금액을 추출
-function parseAction(text) {
+function parseAction(text, state) {
   const t = text.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
   // 부정어 감지
@@ -108,12 +108,23 @@ function parseAction(text) {
     return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
   }
 
-  // 행동 분류
-  if (t.includes('달러') && (t.includes('산다') || t.includes('사') || t.includes('환전') || t.includes('매수') || t.includes('바꾸'))) {
+  // 행동 분류 — SELL을 BUY보다 먼저 체크 (환전 = 매도 우선)
+  if (t.includes('달러') && (t.includes('판다') || t.includes('팔') || t.includes('매도') || t.includes('현금') || t.includes('모두') || t.includes('전부') || t.includes('다 '))) {
+    return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+  }
+  if (t.includes('달러') && (t.includes('산다') || t.includes('사') || t.includes('매수') || t.includes('바꾸'))) {
+    if (t.includes('환전') && !t.includes('으로')) {
+      // "달러로 환전" = 매수, "달러 환전" = 매도 (모호하면 매도 우선)
+      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+    }
     return { type: 'BUY_USD', amount };
   }
-  if (t.includes('달러') && (t.includes('판다') || t.includes('팔') || t.includes('매도') || t.includes('환전') || t.includes('바꾸') || t.includes('현금'))) {
-    return { type: 'SELL_USD', dollarAmount: dollarAmount || amount };
+  if (t.includes('달러') && t.includes('환전')) {
+    // "달러 환전" 단독 = 보유 달러를 현금으로 (매도)
+    if (state && state.assets && state.assets.usd > 0) {
+      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
+    }
+    return { type: 'BUY_USD', amount };
   }
   if (t.includes('금') && (t.includes('산다') || t.includes('사') || t.includes('매수'))) {
     return { type: 'BUY_GOLD', amount };
@@ -255,7 +266,7 @@ function extractTarget(text) {
 
 // 메인 계산 함수
 function calculateStateLocal(action, state, year, month) {
-  const parsed = parseAction(action);
+  const parsed = parseAction(action, state);
   const result = {
     action_type: parsed.type,
     action_valid: true,
