@@ -777,9 +777,28 @@ function calcTotalAssets(state, year, month) {
 }
 
 function dynamicSituation(text) {
-  // 원본 텍스트 그대로 반환 — Gemini가 정확한 자산 금액으로 서사를 생성하므로
-  // 클라이언트에서 금액을 치환하지 않음
-  return text;
+  if (!gameState || !gameState.get) return text;
+  var s = gameState.get();
+  var result = text;
+
+  // 플레이어 보유 주식명으로 치환 (스토리 원본의 "포항제철"을 실제 보유 종목으로)
+  var stocks = s.assets.stocks;
+  if (stocks && stocks.length > 0) {
+    var stockName = stocks[0].name || '코스피';
+    // "포항제철 주식" → "코스닥 주식" 등
+    result = result.replace(/포항제철 주식/g, stockName + ' 주식');
+    result = result.replace(/포항제철을/g, stockName + '을');
+    result = result.replace(/포항제철이/g, stockName + '이');
+    result = result.replace(/포항제철/g, stockName);
+  } else {
+    // 주식 없으면 주식 관련 문구를 일반화
+    result = result.replace(/증권 계좌에 포항제철 주식이 있다\./g, '증권 계좌가 있다.');
+    result = result.replace(/포항제철 주식이 원금을 넘었다\./g, '');
+    result = result.replace(/포항제철을 팔아서 \d+만원 이익을 냈다\./g, '');
+    result = result.replace(/포항제철/g, '주식');
+  }
+
+  return result;
 }
 
 function appendText(text, className) {
