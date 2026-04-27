@@ -429,11 +429,6 @@ function calculateStateLocal(action, state, year, month) {
     case 'SPEND_GIFT':
     case 'SPEND': {
       const amt = parsed.amount;
-      if (amt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다. (보유: ' + Math.floor(cash/10000) + '만원, 필요: ' + Math.floor(amt/10000) + '만원)';
-        break;
-      }
       result.state_changes.assets = { cash_krw: -amt };
       var remaining = cash - amt;
       result.asset_summary = Math.floor(amt/10000) + '만원 지출 → 잔액 ' + Math.floor(remaining/10000) + '만원';
@@ -461,11 +456,6 @@ function calculateStateLocal(action, state, year, month) {
         break;
       }
       var repayAmt = parsed.amount || debts[0].amount || 0;
-      if (repayAmt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다. (보유: ' + Math.floor(cash/10000) + '만원)';
-        break;
-      }
       var debt = debts[0];
       var newDebtAmt = debt.amount - repayAmt;
       if (newDebtAmt <= 0) {
@@ -481,9 +471,8 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'DEPOSIT': {
-      var depAmt = parsed.amount || Math.floor(cash * 0.5);
-      if (depAmt <= 0 || cash <= 0) { result.action_valid = false; result.rejection_reason = '예금할 현금이 없습니다.'; break; }
-      if (depAmt > cash) depAmt = cash;
+      var depAmt = parsed.amount || Math.floor(cash > 0 ? cash * 0.5 : 1000000);
+      if (depAmt <= 0) depAmt = 1000000;
       var depRate = DEPOSIT_RATES[year] || 5;
       var annualInterest = Math.floor(depAmt * depRate / 100);
       result.state_changes.assets = { cash_krw: -depAmt + annualInterest };
@@ -506,14 +495,7 @@ function calculateStateLocal(action, state, year, month) {
       var downRatio = mentionsLoan ? 0.1 : 0.3;
       var downPayment = Math.floor(reAmt * downRatio);
       if (downPayment > cash) {
-        // 현금이 부족해도 최소 계약금(500만원)만 있으면 가능
-        if (cash >= 5000000) {
-          downPayment = cash;
-        } else {
-          result.action_valid = false;
-          result.rejection_reason = '계약금이 부족합니다. (최소 500만원 필요, 보유: ' + Math.floor(cash/10000) + '만원)';
-          break;
-        }
+        downPayment = cash > 0 ? cash : 0;
       }
       var mortgage = reAmt - downPayment;
       var mortgageRate = (DEPOSIT_RATES[year] || 5) + 2;
@@ -567,11 +549,7 @@ function calculateStateLocal(action, state, year, month) {
       var bldDownRatio = mentionsBldLoan ? 0.1 : 0.3;
       var bldDown = Math.floor(bldAmt * bldDownRatio);
       if (bldDown > cash) {
-        if (cash >= 5000000) { bldDown = cash; } else {
-          result.action_valid = false;
-          result.rejection_reason = '계약금이 부족합니다. (필요: ' + Math.floor(bldDown/10000) + '만원)';
-          break;
-        }
+        bldDown = cash > 0 ? cash : 0;
       }
       var bldLoan = bldAmt - bldDown;
       var bldRate = (DEPOSIT_RATES[year] || 5) + 2;
@@ -620,11 +598,6 @@ function calculateStateLocal(action, state, year, month) {
     }
     case 'BUY_BUSINESS': {
       var bizAmt = parsed.amount || 50000000; // 기본 5000만원
-      if (bizAmt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다. (보유: ' + Math.floor(cash/10000) + '만원)';
-        break;
-      }
       // 사업체 수익은 불확실 — 월 매출의 10~30% 순이익
       var bizMonthlyProfit = Math.floor(bizAmt * (0.1 + Math.random() * 0.2) / 12);
       result.state_changes.assets = { cash_krw: -bizAmt };
@@ -656,9 +629,8 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_FUND': {
-      var fundAmt = parsed.amount || Math.floor(cash * 0.5);
-      if (fundAmt <= 0 || cash <= 0) { result.action_valid = false; result.rejection_reason = '투자할 현금이 없습니다.'; break; }
-      if (fundAmt > cash) fundAmt = cash;
+      var fundAmt = parsed.amount || Math.floor(cash > 0 ? cash * 0.5 : 1000000);
+      if (fundAmt <= 0) fundAmt = 1000000;
       var isChinaFund = action.includes('중국');
       var fundName = isChinaFund ? '중국펀드' : '국내펀드';
       // 펀드 수익률: 시기에 따라 다름
@@ -756,11 +728,6 @@ function calculateStateLocal(action, state, year, month) {
     case 'SUPPORT_FAMILY': {
       var supportAmt = parsed.amount || 500000;
       var supportTarget = parsed.target || 'mother';
-      if (supportAmt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다.';
-        break;
-      }
       result.state_changes.assets = { cash_krw: -supportAmt };
       result.state_changes.relationships = { [supportTarget]: 10 };
       var targetName = { father: '아버지', mother: '어머니', seungyeon: '승연이', eunji: '은지' }[supportTarget] || supportTarget;
@@ -771,11 +738,6 @@ function calculateStateLocal(action, state, year, month) {
     }
     case 'BUY_INFO': {
       var infoCost = parsed.amount || 1000000;
-      if (infoCost > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다.';
-        break;
-      }
       result.state_changes.assets = { cash_krw: -infoCost };
       result.state_changes.stats = { info_level: 1 };
       // 정보 품질 랜덤 — 50% 좋은 정보, 30% 쓸모없음, 20% 거짓
@@ -796,11 +758,6 @@ function calculateStateLocal(action, state, year, month) {
     }
     case 'BUY_INSURANCE': {
       var insPremium = parsed.amount || 300000;
-      if (insPremium > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다.';
-        break;
-      }
       result.state_changes.assets = { cash_krw: -insPremium };
       // 보험 플래그 설정 — 다음 투자 함정 시 손실 50% 감소
       result.state_changes.stats = { insurance: 1 };
@@ -832,11 +789,6 @@ function calculateStateLocal(action, state, year, month) {
     }
     case 'STUDY': {
       var studyCost = parsed.amount || 5000000;
-      if (studyCost > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '학비가 부족합니다. (필요: ' + Math.floor(studyCost/10000) + '만원)';
-        break;
-      }
       var studyType = '';
       if (action.includes('유학')) { studyType = '유학'; }
       else if (action.includes('mba') || action.includes('석사')) { studyType = 'MBA'; }
@@ -851,13 +803,8 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'LEVERAGE_TRADE': {
-      var levAmt = parsed.amount || 0;
-      if (levAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      if (levAmt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '증거금이 부족합니다.';
-        break;
-      }
+      var levAmt = parsed.amount || Math.floor(cash > 0 ? cash * 0.3 : 1000000);
+      if (levAmt <= 0) levAmt = 1000000;
       // 레버리지 3배 — 수익도 3배, 손실도 3배
       var levMultiplier = 3;
       var baseReturn = (Math.random() - 0.45) * 0.3; // -13.5% ~ +16.5% 기본 수익률
@@ -926,11 +873,6 @@ function calculateStateLocal(action, state, year, month) {
     case 'GO_COLLEGE': {
       // 대학 진학 — 등록금 지출, 장기적 수입 증가
       var tuition = 1800000; // 반액 장학금 기준
-      if (tuition > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '등록금이 부족합니다. (필요: 180만원, 보유: ' + Math.floor(cash/10000) + '만원)';
-        break;
-      }
       result.state_changes.assets = { cash_krw: -tuition };
       result.state_changes.stats = { job: 'student_college', info_level: 0.5 };
       result.asset_summary = '등록금 180만원 납부 → 잔액 ' + Math.floor((cash - tuition)/10000) + '만원';
@@ -964,16 +906,8 @@ function calculateStateLocal(action, state, year, month) {
       var stockAmt = parsed.amount || 0;
       // 금액 미지정 시 현금의 50% 자동 투자
       if (stockAmt <= 0) {
-        stockAmt = Math.floor(cash * 0.5);
-        if (stockAmt < 100000) stockAmt = cash; // 10만원 미만이면 전액
-      }
-      if (stockAmt <= 0 || cash <= 0) {
-        result.action_valid = false;
-        result.rejection_reason = '투자할 현금이 없습니다.';
-        break;
-      }
-      if (stockAmt > cash) {
-        stockAmt = cash; // 보유 현금 초과 시 전액 투자
+        stockAmt = Math.floor(cash > 0 ? cash * 0.5 : 1000000);
+        if (stockAmt < 100000) stockAmt = 1000000;
       }
       // 코스닥인지 코스피인지 판별 — 시대별 자동 선택
       var isKosdaq = action.includes('코스닥') || action.includes('벤처') || action.includes('새롬') || action.includes('골드뱅크') || action.includes('다음') || action.includes('IT');

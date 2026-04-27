@@ -450,7 +450,6 @@ function goToNextChapter() {
     for (var dbi = 0; dbi < debts.length; dbi++) {
       var debtInterest = Math.floor(debts[dbi].amount * (debts[dbi].rate || 10) / 100 / 12 * monthsElapsed);
       gameState.get().assets.cash_krw -= debtInterest;
-      if (gameState.get().assets.cash_krw < 0) gameState.get().assets.cash_krw = 0;
       console.log('이자 차감: -' + Math.floor(debtInterest/10000) + '만원 (' + debts[dbi].source + ')');
     }
 
@@ -460,7 +459,6 @@ function goToNextChapter() {
     if (cardDebt > 0) {
       var cardInterest = Math.floor(cardDebt * 0.24 / 12 * monthsElapsed);
       gameState.get().assets.cash_krw -= cardInterest;
-      if (gameState.get().assets.cash_krw < 0) gameState.get().assets.cash_krw = 0;
       console.log('카드 이자 차감: -' + Math.floor(cardInterest/10000) + '만원 (부채 ' + Math.floor(cardDebt/10000) + '만원)');
     }
 
@@ -690,9 +688,6 @@ function applyStateChanges(changes) {
       if (typeof val === 'number') {
         const before = state.assets[key] || 0;
         state.assets[key] = before + val;
-        if (key === 'cash_krw' && state.assets[key] < 0) {
-          state.assets[key] = 0;
-        }
         console.log('자산 변경: ' + key + ' ' + before + ' -> ' + state.assets[key] + ' (' + (val > 0 ? '+' : '') + val + ')');
       } else if (Array.isArray(val)) {
         state.assets[key] = val;
