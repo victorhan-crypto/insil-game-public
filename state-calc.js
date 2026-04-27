@@ -127,18 +127,25 @@ function parseAction(text, state) {
 
   // ═══ 1. 달러 거래 ═══
   if (t.includes('달러') || t.includes('$') || t.includes('환전') || t.includes('외화')) {
-    // 매도 우선 체크
-    if (SELL || t.includes('현금으로') || t.includes('원화로') || /모두|전부|다 /.test(t)) {
-      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
-    }
-    if (BUY || t.includes('바꾸') || t.includes('바꿔') || (t.includes('달러로') && t.includes('환전'))) {
+    // "달러로 바꾸" = 매수 (원화→달러)를 먼저 체크
+    if (t.includes('달러로') && (t.includes('바꾸') || t.includes('바꿔') || t.includes('환전'))) {
       return { type: 'BUY_USD', amount };
+    }
+    // "바꾸자", "사자" 등 매수 의도
+    if (BUY || t.includes('바꾸') || t.includes('바꿔')) {
+      return { type: 'BUY_USD', amount };
+    }
+    // 매도 체크 — "달러를 팔다", "달러를 현금으로"
+    if (SELL || t.includes('현금으로') || t.includes('원화로')) {
+      return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
     }
     // "환전" 단독 → 보유 달러 있으면 매도, 없으면 매수
     if (t.includes('환전')) {
       if (state && state.assets && state.assets.usd > 0) return { type: 'SELL_USD', dollarAmount: dollarAmount || 0 };
       return { type: 'BUY_USD', amount };
     }
+    // 달러 키워드만 있고 동사 없으면 매수로 기본 처리
+    return { type: 'BUY_USD', amount };
   }
 
   // ═══ 2. 금 거래 ═══
