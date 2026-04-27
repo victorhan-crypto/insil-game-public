@@ -823,13 +823,17 @@ function dynamicSituation(text) {
   result = result.replace(/코스닥에서 200만원을 잃었다/g, '##DONGJUN_LOSS##');
   result = result.replace(/200만원을 빌려달라/g, '##DONGJUN_BORROW##');
 
-  // 나머지 "200만원" → 실제 현금
+  // 나머지 "200만원" → 실제 현금 (다양한 패턴)
   result = result.replace(/200만원이 통장에/g, cashText + '이 통장에');
   result = result.replace(/통장에 200만원/g, '통장에 ' + cashText);
   result = result.replace(/통장을 보고 있다\. 200만원/g, '통장을 보고 있다. ' + cashText);
-  // "N만원이 통장에" 패턴 (200 외 다른 금액도)
   result = result.replace(/\d+만원이 통장에/g, cashText + '이 통장에');
   result = result.replace(/통장에 \d+만원/g, '통장에 ' + cashText);
+  // "200만원이 있다" (통장 없이)
+  result = result.replace(/200만원이 있다/g, cashText + '이 있다');
+  // 남은 모든 독립적 "200만원" → 실제 자산 (문장 내 금액 참조)
+  result = result.replace(/\. 200만원\./g, '. ' + cashText + '.');
+  result = result.replace(/\. 200만원 /g, '. ' + cashText + ' ');
 
   // 보호된 패턴 복원
   result = result.replace(/##GRANDMA##/g, '할머니가 준 200만원');
