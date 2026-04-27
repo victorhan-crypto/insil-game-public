@@ -257,7 +257,12 @@ ${relDesc.join(' ')}
 ${state.assets.usd > 0 ? '달러: $' + state.assets.usd + ' 보유 중' : ''}
 ${state.assets.gold_gram > 0 ? '금: ' + state.assets.gold_gram + 'g 보유 중' : ''}
 ${state.assets.debt && state.assets.debt.length > 0 ? '빚: ' + state.assets.debt.map(d => d.source + ' ' + Math.floor(d.amount/10000) + '만원').join(', ') : ''}
-스토리 속 고정 금액: 학원비 30만원, 등록금 반액 180만원, 사채 780만원, 알바 월 43만원. 이 금액은 바꾸지 마라.
+스토리 속 고정 금액 (절대 바꾸지 마라. 현재 자산과 혼동하지 마라):
+- 할머니가 준 돈: 200만원 (게임 시작 자산. 현재 통장 잔고와 다르다. 할머니 돈을 언급할 때는 반드시 200만원이라고 써라)
+- 학원비: 30만원
+- 등록금 반액: 180만원
+- 사채: 780만원
+- 알바 월급: 43만원
 
 ═══ 챕터 배경 ═══
 ${chapterSummary}
