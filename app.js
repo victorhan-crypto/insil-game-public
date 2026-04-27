@@ -26,6 +26,15 @@ const sAge = document.getElementById('s-age');
 const sCash = document.getElementById('s-cash');
 const sChapter = document.getElementById('s-chapter');
 
+// ═══ 언어 선택 ═══
+document.querySelectorAll('.lang-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    setLang(btn.dataset.lang);
+  });
+});
+// 페이지 로드 시 저장된 언어 적용
+applyI18n();
+
 // 이벤트
 document.getElementById('start-btn').addEventListener('click', startGame);
 sendBtn.addEventListener('click', handleInput);
@@ -80,7 +89,7 @@ document.getElementById('detail-close').addEventListener('click', () => {
 function startGame() {
   const geminiKey = document.getElementById('gemini-key').value.trim().replace(/\s/g, '');
   if (!geminiKey) {
-    alert('Gemini API Key를 입력해주세요.');
+    alert(t('alertNoKey'));
     return;
   }
 
@@ -89,7 +98,7 @@ function startGame() {
   gameState = new GameState();
 
   if (gameState.load()) {
-    if (confirm('저장된 게임이 있습니다. 이어서 하시겠습니까?')) {
+    if (confirm(t('continuePrompt'))) {
       startScreen.style.display = 'none';
       gameScreen.style.display = 'flex';
       updateStatusBar();
@@ -156,7 +165,7 @@ function showNextPage() {
 
   // 현재 화면 글을 로그에 저장
   const currentText = narrativeText.textContent.trim();
-  if (currentText && currentText !== '\u25b6 탭하여 계속') {
+  if (currentText && currentText !== t('tapToContinue')) {
     pageLog.push(currentText);
   }
 
@@ -172,7 +181,7 @@ function showNextPage() {
     const hint = document.createElement('div');
     hint.id = 'page-hint';
     hint.className = 'page-hint';
-    hint.textContent = '\u25b6 탭하여 계속';
+    hint.textContent = t('tapToContinue');
     narrativeText.appendChild(hint);
   }
 }
@@ -184,7 +193,7 @@ document.getElementById('log-btn').addEventListener('click', () => {
   content.innerHTML = '';
 
   if (pageLog.length === 0) {
-    content.innerHTML = '<div class="log-entry" style="color:#555;">아직 이전 글이 없습니다.</div>';
+    content.innerHTML = '<div class="log-entry" style="color:#555;">' + t('noLogYet') + '</div>';
   } else {
     pageLog.forEach((text, i) => {
       const entry = document.createElement('div');
@@ -206,10 +215,10 @@ document.getElementById('log-close').addEventListener('click', () => {
 document.getElementById('save-btn').addEventListener('click', () => {
   gameState.save();
   const btn = document.getElementById('save-btn');
-  btn.textContent = '\u2705';
+  btn.textContent = t('savedOk');
   btn.style.borderColor = '#4a6a4a';
   setTimeout(() => {
-    btn.textContent = '\u2661';
+    btn.textContent = t('btnSave');
     btn.style.borderColor = '';
   }, 1500);
 });
@@ -261,7 +270,7 @@ function loadChapter(code) {
     // 탭 안내
     var hint = document.createElement('div');
     hint.className = 'page-hint';
-    hint.textContent = '\u25b6 탭하여 시작';
+    hint.textContent = t('tapToStart');
     narrativeText.appendChild(hint);
 
     // 이미지 클릭, 화면 클릭, 스페이스 모두 시작
@@ -504,7 +513,7 @@ async function handleInput() {
   } catch (e) {
     console.error('처리 오류:', e);
     showLoading(false);
-    appendText('(오류: ' + e.message + ')', 'intervention');
+    appendText(t('errorPrefix') + e.message + t('errorSuffix'), 'intervention');
     enableInput();
   }
 }
@@ -704,7 +713,7 @@ function updateStatusBar() {
     cashText += ' +' + st.name + '(' + Math.floor(stockVal/10000) + '\uB9CC\uC6D0)';
   }
   sCash.textContent = cashText;
-  sChapter.textContent = s.story.current_chapter + '\ud3b8';
+  sChapter.textContent = s.story.current_chapter + t('chapterUnit');
 }
 
 function enableInput() {
@@ -770,11 +779,11 @@ function renderIndex() {
     html += '<div class="index-item ' + status + '" data-code="' + code + '">'
       + '<span class="idx-marker">' + marker + '</span>'
       + '<span class="idx-title">' + title + '</span>'
-      + (status === 'completed' ? '<span class="idx-go">다시 읽기 \u2192</span>' : '')
+      + (status === 'completed' ? '<span class="idx-go">' + t('rereadGo') + '</span>' : '')
       + '</div>';
   });
 
-  html += '<button id="index-close">닫기</button>';
+  html += '<button id="index-close">' + t('indexClose') + '</button>';
   indexList.innerHTML = html;
 
   indexList.querySelectorAll('.index-item.completed').forEach(item => {
@@ -800,14 +809,14 @@ function renderIndex() {
 function showReadOnlyChapter(ch) {
   narrativeText.innerHTML = '';
   disableInput();
-  appendText('\ud83d\udcd6 다시 읽기', 'chapter-title');
+  appendText(t('reread'), 'chapter-title');
   appendText(ch.title, 'chapter-title');
   appendText('\u2500\u2500\u2500', 'divider');
 
   startPageMode(ch.opening, () => {
     const backBtn = document.createElement('div');
     backBtn.className = 'intervention';
-    backBtn.textContent = '\u21a9 현재 챕터로 돌아가기';
+    backBtn.textContent = t('backToCurrent');
     backBtn.style.cursor = 'pointer';
     backBtn.style.textAlign = 'center';
     backBtn.addEventListener('click', returnToCurrentChapter);
@@ -839,19 +848,19 @@ function showGameResult() {
   var resultDiv = document.createElement('div');
   resultDiv.className = 'game-result';
   resultDiv.innerHTML =
-    '<div class="result-title">「인생은 실전이야」 완료</div>' +
-    '<div class="result-subtitle">1997 ~ 2007 · 10년의 기록</div>' +
+    '<div class="result-title">' + t('resultTitle') + '</div>' +
+    '<div class="result-subtitle">' + t('resultSubtitle') + '</div>' +
     '<div class="result-divider">───</div>' +
-    '<div class="result-stat"><span>최종 자산</span><span class="result-value">' + formatAssetFull(totalAssets) + '</span></div>' +
-    '<div class="result-stat"><span>현금</span><span>' + cashText + '</span></div>' +
-    (s.assets.usd > 0 ? '<div class="result-stat"><span>달러</span><span>' + s.assets.usd + '$</span></div>' : '') +
-    (s.assets.gold_gram > 0 ? '<div class="result-stat"><span>금</span><span>' + s.assets.gold_gram + 'g</span></div>' : '') +
-    (s.assets.stocks && s.assets.stocks.length > 0 ? '<div class="result-stat"><span>주식</span><span>' + s.assets.stocks[0].name + ' ' + s.assets.stocks[0].quantity + '주 (' + formatAssetFull(s.assets.stocks[0].quantity * (typeof getIndex === 'function' ? getIndex(s.assets.stocks[0].name === '코스닥' ? KOSDAQ : KOSPI, 2007, 12) : 100) * 100) + ')</span></div>' : '') +
-    (s.assets.debt && s.assets.debt.length > 0 ? '<div class="result-stat"><span>부채</span><span style="color:#9a6a6a">-' + formatAssetFull(s.assets.debt.reduce(function(sum,d){return sum+(d.amount||0);},0)) + '</span></div>' : '') +
-    '<div class="result-stat"><span>시작 자산</span><span>200만원</span></div>' +
-    '<div class="result-stat"><span>수익률</span><span>' + Math.round((totalAssets - 2000000) / 2000000 * 100) + '%</span></div>' +
+    '<div class="result-stat"><span>' + t('resultFinalAsset') + '</span><span class="result-value">' + formatAssetFull(totalAssets) + '</span></div>' +
+    '<div class="result-stat"><span>' + t('resultCash') + '</span><span>' + cashText + '</span></div>' +
+    (s.assets.usd > 0 ? '<div class="result-stat"><span>' + t('resultDollar') + '</span><span>' + s.assets.usd + '$</span></div>' : '') +
+    (s.assets.gold_gram > 0 ? '<div class="result-stat"><span>' + t('resultGold') + '</span><span>' + s.assets.gold_gram + t('gram') + '</span></div>' : '') +
+    (s.assets.stocks && s.assets.stocks.length > 0 ? '<div class="result-stat"><span>' + t('resultStock') + '</span><span>' + s.assets.stocks[0].name + ' ' + s.assets.stocks[0].quantity + t('share') + ' (' + formatAssetFull(s.assets.stocks[0].quantity * (typeof getIndex === 'function' ? getIndex(s.assets.stocks[0].name === '코스닥' ? KOSDAQ : KOSPI, 2007, 12) : 100) * 100) + ')</span></div>' : '') +
+    (s.assets.debt && s.assets.debt.length > 0 ? '<div class="result-stat"><span>' + t('resultDebt') + '</span><span style="color:#9a6a6a">-' + formatAssetFull(s.assets.debt.reduce(function(sum,d){return sum+(d.amount||0);},0)) + '</span></div>' : '') +
+    '<div class="result-stat"><span>' + t('resultStartAsset') + '</span><span>200' + t('manwon') + '</span></div>' +
+    '<div class="result-stat"><span>' + t('resultReturn') + '</span><span>' + Math.round((totalAssets - 2000000) / 2000000 * 100) + '%</span></div>' +
     '<div class="result-divider">───</div>' +
-    '<div class="result-message">2008년이 왔다. 다음 10년이 시작된다.</div>';
+    '<div class="result-message">' + t('resultMessage') + '</div>';
   narrativeText.appendChild(resultDiv);
 
   // 리더보드 표시
@@ -860,7 +869,7 @@ function showGameResult() {
 
   var boardDiv = document.createElement('div');
   boardDiv.className = 'leaderboard';
-  var boardHTML = '<div class="lb-title">🏆 역대 플레이어 순위</div>';
+  var boardHTML = '<div class="lb-title">' + t('leaderboardTitle') + '</div>';
 
   var top10 = board.slice(0, 10);
   for (var i = 0; i < top10.length; i++) {
@@ -882,19 +891,19 @@ function showGameResult() {
       '</div>' +
       '<div class="lb-row lb-me">' +
       '<span class="lb-rank">' + myRank + '.</span>' +
-      '<span class="lb-name">나 (이번 플레이)</span>' +
+      '<span class="lb-name">' + t('thisPlay') + '</span>' +
       '<span class="lb-asset">' + formatAssetFull(totalAssets) + '</span>' +
       '</div>';
   }
 
-  boardHTML += '<div class="lb-total">총 ' + board.length + '회 플레이</div>';
+  boardHTML += '<div class="lb-total">' + t('leaderboardTotal').replace('{n}', board.length) + '</div>';
   boardDiv.innerHTML = boardHTML;
   narrativeText.appendChild(boardDiv);
 
   // 다시하기 버튼
   var retryBtn = document.createElement('button');
   retryBtn.className = 'retry-btn';
-  retryBtn.textContent = '처음부터 다시하기';
+  retryBtn.textContent = t('retryBtn');
   retryBtn.addEventListener('click', function() {
     localStorage.removeItem('imf_game_state');
     localStorage.removeItem('imf_game_history');
@@ -919,7 +928,7 @@ function saveToLeaderboard(totalAssets) {
   // 새 기록 추가
   var playNum = board.length + 1;
   board.push({
-    name: '플레이어 #' + playNum,
+    name: t('playerLabel').replace('{n}', playNum),
     assets: totalAssets,
     date: new Date().toISOString().slice(0, 10),
     isLatest: true

@@ -200,6 +200,12 @@ ${JSON.stringify(currentState.assets, null, 2)}
       2007: '2007년. 서브프라임 위기 전야. 베어스턴스 파산. 원더걸스 Tell Me. 10년의 끝.'
     };
 
+    const langInstruction = currentLang === 'en'
+      ? '\n═══ LANGUAGE ═══\nWrite the narrative in ENGLISH. Keep the same literary style but in English. Character names stay Korean (Seungsu, Eunji, Dongjun, etc). Currency amounts use "만원" format but add English equivalent in parentheses.\n'
+      : currentLang === 'ja'
+      ? '\n═══ 言語 ═══\n日本語で書いてください。同じ文学的スタイルを維持しつつ、日本語で。人物名は韓国語のまま（スンス、ウンジ、ドンジュンなど）。金額は「万ウォン」形式で。\n'
+      : '';
+
     const prompt = `너는 "박승수의 10년"이라는 텍스트 기반 경제 시뮬레이션 게임의 서사 작가다.
 플레이어가 행동을 입력하면, 그 행동의 결과를 소설처럼 써야 한다.
 
@@ -274,7 +280,7 @@ ${stateResult?.trap ? `═══ 투자 함정 발생 ═══\n${stateResult.t
 ${hints.details ? `═══ 서사 힌트 ═══\n톤: ${hints.tone}\n디테일: ${hints.details}\n` : ''}
 
 위 모든 맥락을 반영해서, 플레이어의 행동에 대한 서사를 소설처럼 써라.
-서사 텍스트만 출력. 메타 설명 없음. 제목 없음. 마크다운 없음.`;
+서사 텍스트만 출력. 메타 설명 없음. 제목 없음. 마크다운 없음.${langInstruction}`;
 
     try {
       return await this.callGemini(prompt, { temperature: 0.85, maxTokens: 2048 });
