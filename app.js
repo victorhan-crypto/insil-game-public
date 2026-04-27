@@ -454,6 +454,16 @@ function goToNextChapter() {
     }
 
     // 대학생이면 매년 3월에 등록금 자동 차감 (반액 장학금 기준 180만원)
+    // 카드 부채 이자 차감 (연 24%)
+    var cardDebt = gameState.get().stats.card_debt || 0;
+    if (cardDebt > 0) {
+      var cardInterest = Math.floor(cardDebt * 0.24 / 12 * monthsElapsed);
+      gameState.get().assets.cash_krw -= cardInterest;
+      if (gameState.get().assets.cash_krw < 0) gameState.get().assets.cash_krw = 0;
+      console.log('카드 이자 차감: -' + Math.floor(cardInterest/10000) + '만원 (부채 ' + Math.floor(cardDebt/10000) + '만원)');
+    }
+
+    // 대학생이면 매년 3월에 등록금 자동 차감
     // 1999~2002년 사이면 대학생으로 간주
     var playerAge = nextCh.year - 1979;
     var isCollegeAge = (playerAge >= 20 && playerAge <= 23);

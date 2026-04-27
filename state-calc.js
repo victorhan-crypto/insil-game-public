@@ -186,6 +186,19 @@ function parseAction(text, state) {
     }
   }
 
+  // ═══ 8.5. 카드 발급/사용 ═══
+  if (/카드/.test(t) && /신청|만들|발급|가입|받/.test(t)) {
+    return { type: 'GET_CARD', amount: 0 };
+  }
+  if (/카드/.test(t) && /쓴|썼|긁|결제|사용|질러|질렀/.test(t)) {
+    return { type: 'USE_CARD', amount: amount || 500000 };
+  }
+
+  // ═══ 8.6. 데이트/유흥/소비 생활 ═══
+  if (/데이트|영화|밥|술|노래방|카페|쇼핑|옷|놀러|여행|외식|회식/.test(t)) {
+    return { type: 'LIFESTYLE_SPEND', amount: amount || 200000 };
+  }
+
   // ═══ 9. 빚 상환 ═══
   if (REPAY_V && (t.includes('빚') || t.includes('사채') || t.includes('대출') || t.includes('이자') || amount > 0)) {
     return { type: 'REPAY', amount };
@@ -987,6 +1000,69 @@ function calculateStateLocal(action, state, year, month) {
       result.asset_summary = stock.name + ' ' + stock.quantity + '주 매도 → +' + Math.floor(sellProceeds/10000) + '만원 (지수 ' + sellIndex + ') | ' + (profit >= 0 ? '수익 +' : '손실 ') + Math.floor(profit/10000) + '만원 (' + (profit >= 0 ? '+' : '') + profitPct + '%)';
       result.action_description = stock.name + ' 매도 (' + (profit >= 0 ? '수익' : '손실') + ' ' + profitPct + '%)';
       result.narrative_hints = { tone: profit >= 0 ? 'relieved' : 'bitter', details: '주식을 팔았다. ' + (profit >= 0 ? Math.floor(profit/10000) + '만원 벌었다.' : Math.floor(Math.abs(profit)/10000) + '만원 잃었다.') };
+      break;
+    }
+    case 'GET_CARD': {
+      // 카드 발급 — 2001~2003년 카드 남발 시기
+      var cardLimit = 3000000; // 기본 한도 300만원
+      if (year >= 2001 && year <= 2003) cardLimit = 10000000; // 카드 대란기 한도 1000만원
+      // 카드 플래그 설정
+      result.state_changes.stats = { has_card: 1, card_limit: cardLimit, card_debt: 0 };
+      result.asset_summary = '신용카드 발급 완료 (한도 ' + Math.floor(cardLimit/10000) + '만원)';
+      result.action_description = '신용카드 발급';
+      if (year >= 2001 && year <= 2003) {
+        result.narrative_hints = { tone: 'ominous', details: '카드사 직원이 웃으며 카드를 건넸다. 한도 ' + Math.floor(cardLimit/10000) + '만원. 신분증만 보여주면 됐다. 심사 같은 건 없었다. "많이 쓰세요." 그 말이 이상하게 들렸다.' };
+      } else {
+        result.narrative_hints = { tone: 'neutral', details: '은행에서 카드를 만들었다. 한도 ' + Math.floor(cardLimit/10000) + '만원.' };
+      }
+      break;
+    }
+    case 'USE_CARD': {
+      // 카드 사용 — 현금 안 빠지고 카드 부채 증가
+      var cardAmt = parsed.amount || 500000;
+      var hasCard = state.stats && state.stats.has_card;
+      if (!hasCard) {
+        // 카드 없으면 현금 지출로 전환
+        if (cardAmt > cash) {
+          result.action_valid = false;
+          result.rejection_reason = '카드가 없고 현금도 부족합니다.';
+          break;
+        }
+        result.state_changes.assets = { cash_krw: -cardAmt };
+        result.asset_summary = Math.floor(cardAmt/10000) + '만원 현금 지출 (카드 없음)';
+        break;
+      }
+      // 카드 부채 추가
+      var currentCardDebt = (state.stats.card_debt || 0) + cardAmt;
+      result.state_changes.stats = { card_debt: currentCardDebt };
+      result.asset_summary = '카드 결제 ' + Math.floor(cardAmt/10000) + '만원 (카드 부채 누적 ' + Math.floor(currentCardDebt/10000) + '만원)';
+      result.action_description = '카드 ' + Math.floor(cardAmt/10000) + '만원 결제';
+      result.narrative_hints = { tone: 'careless', details: '카드를 긁었다. ' + Math.floor(cardAmt/10000) + '만원. 통장에서 안 빠지니까 가벼웠다. 명세서는 다음 달에 온다.' };
+      break;
+    }
+    case 'LIFESTYLE_SPEND': {
+      // 데이트/유흥/소비 — 현금 차감 + 관계 상승
+      var spendAmt = parsed.amount || 200000;
+      // 카드가 있으면 카드로 결제
+      var hasCard2 = state.stats && state.stats.has_card;
+      if (hasCard2) {
+        var currentDebt = (state.stats.card_debt || 0) + spendAmt;
+        result.state_changes.stats = { card_debt: currentDebt, monthly_expense: (state.stats.monthly_expense || 150000) + 50000 };
+        result.asset_summary = Math.floor(spendAmt/10000) + '만원 소비 (카드 결제 → 부채 ' + Math.floor(currentDebt/10000) + '만원)';
+        result.narrative_hints = { tone: 'light', details: '카드를 긁었다. ' + Math.floor(spendAmt/10000) + '만원. 즐거웠다. 명세서는 나중에 생각하기로 했다.' };
+      } else {
+        if (spendAmt > cash) spendAmt = Math.floor(cash * 0.3);
+        if (spendAmt <= 0) { result.action_description = '돈이 없어서 못 갔다'; result.narrative_hints = { tone: 'bitter', details: '지갑을 열었다. 비어 있었다.' }; break; }
+        result.state_changes.assets = { cash_krw: -spendAmt };
+        result.state_changes.stats = { monthly_expense: (state.stats.monthly_expense || 150000) + 30000 };
+        result.asset_summary = Math.floor(spendAmt/10000) + '만원 소비 → 잔액 ' + Math.floor((cash - spendAmt)/10000) + '만원';
+        result.narrative_hints = { tone: 'light', details: '돈을 썼다. ' + Math.floor(spendAmt/10000) + '만원. 가끔은 이런 것도 필요했다.' };
+      }
+      // 은지와 데이트면 관계 상승
+      if (/은지|데이트/.test(action)) {
+        result.state_changes.relationships = { eunji: 5 };
+      }
+      result.action_description = Math.floor(spendAmt/10000) + '만원 소비';
       break;
     }
     case 'NONE': {
