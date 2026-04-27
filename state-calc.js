@@ -463,20 +463,43 @@ function calculateStateLocal(action, state, year, month) {
     }
     case 'REPAY': {
       var debts = state.assets.debt || [];
-      if (debts.length === 0) {
+      var cardDebt = (state.stats && state.stats.card_debt) || 0;
+      if (debts.length === 0 && cardDebt <= 0) {
         result.action_valid = false;
         result.rejection_reason = '갚을 빚이 없습니다.';
         break;
       }
-      var repayAmt = parsed.amount || debts[0].amount || 0;
-      var debt = debts[0];
+      // 카드빚 상환 우선 체크
+      if (/카드/.test(action) && cardDebt > 0) {
+        var cardRepay = parsed.amount || cardDebt;
+        if (cardRepay > cardDebt) cardRepay = cardDebt;
+        result.state_changes.assets = { cash_krw: -cardRepay };
+        result.state_changes.stats = { card_debt: cardDebt - cardRepay };
+        result.asset_summary = '카드 부채 ' + Math.floor(cardRepay/10000) + '만원 상환' + (cardDebt - cardRepay <= 0 ? ' (완납)' : ' → 잔액 ' + Math.floor((cardDebt - cardRepay)/10000) + '만원');
+        result.action_description = '카드빚 상환';
+        result.narrative_hints = { tone: 'relieved', details: '카드빚을 갚았다.' };
+        break;
+      }
+      // 특정 빚 선택 (사채/은행/담보 등 키워드로)
+      var targetIdx = 0;
+      for (var di = 0; di < debts.length; di++) {
+        if (/사채/.test(action) && debts[di].source.includes('사채')) { targetIdx = di; break; }
+        if (/은행/.test(action) && debts[di].source.includes('은행')) { targetIdx = di; break; }
+        if (/담보/.test(action) && debts[di].source.includes('담보')) { targetIdx = di; break; }
+        if (/신용/.test(action) && debts[di].source.includes('신용')) { targetIdx = di; break; }
+      }
+      var debt = debts[targetIdx];
+      var repayAmt = parsed.amount || debt.amount;
+      if (repayAmt > debt.amount) repayAmt = debt.amount;
       var newDebtAmt = debt.amount - repayAmt;
       if (newDebtAmt <= 0) {
-        result.state_changes.assets = { cash_krw: -debt.amount, debt: [] };
+        // 해당 빚 완전 제거
+        result.state_changes.assets = { cash_krw: -debt.amount };
+        result.state_changes.assets.debt_remove = debt.source;
         result.asset_summary = debt.source + ' ' + Math.floor(debt.amount/10000) + '만원 전액 상환 완료';
       } else {
         result.state_changes.assets = { cash_krw: -repayAmt };
-        result.state_changes.assets.debt_update = { index: 0, amount: newDebtAmt };
+        result.state_changes.assets.debt_update = { index: targetIdx, amount: newDebtAmt };
         result.asset_summary = debt.source + ' ' + Math.floor(repayAmt/10000) + '만원 상환 → 잔액 ' + Math.floor(newDebtAmt/10000) + '만원';
       }
       result.action_description = '빚 상환 ' + Math.floor(repayAmt/10000) + '만원';

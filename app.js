@@ -595,6 +595,18 @@ async function handleInput() {
     }
 
     // 즉시 상태바 업데이트
+    // 매 개입마다 부채 이자 반영 (월 단위)
+    var currentDebts = gameState.get().assets.debt || [];
+    for (var dbi = 0; dbi < currentDebts.length; dbi++) {
+      var monthlyInt = Math.floor(currentDebts[dbi].amount * (currentDebts[dbi].rate || 10) / 100 / 12);
+      currentDebts[dbi].amount += monthlyInt; // 복리 — 이자가 원금에 추가
+      console.log('이자 누적: ' + currentDebts[dbi].source + ' +' + Math.floor(monthlyInt/10000) + '만원 → 총 ' + Math.floor(currentDebts[dbi].amount/10000) + '만원');
+    }
+    // 카드 부채 이자도
+    if (gameState.get().stats.card_debt > 0) {
+      var cardInt = Math.floor(gameState.get().stats.card_debt * 0.24 / 12);
+      gameState.get().stats.card_debt += cardInt;
+    }
     updateStatusBar();
     gameState.save();
     console.log('현재 자산:', JSON.stringify(gameState.get().assets));
@@ -850,19 +862,44 @@ function updateStatusBar() {
   var s = gameState.get();
   sYear.textContent = s.player.year;
   sAge.textContent = s.player.age;
+
+  // 총 자산 계산 (현금 + 투자 시가 - 부채)
+  var totalAssets = calcTotalAssets(s, s.player.year, s.player.month);
   var cashText = gameState.formatCash();
+
+  // 투자 자산 표시
+  var extras = [];
   if (s.assets.usd > 0) {
-    var currentRate = getExchangeRate ? getExchangeRate(s.player.year, s.player.month) : 1000;
-    var usdValue = s.assets.usd * currentRate;
-    cashText += ' +$' + s.assets.usd + '(' + Math.floor(usdValue/10000) + '\uB9CC\uC6D0)';
+    var currentRate = typeof getExchangeRate === 'function' ? getExchangeRate(s.player.year, s.player.month) : 1000;
+    extras.push('$' + s.assets.usd + '(' + Math.floor(s.assets.usd * currentRate / 10000) + '만원)');
   }
-  if (s.assets.gold_gram > 0) cashText += ' +\uAE08' + s.assets.gold_gram + 'g';
+  if (s.assets.gold_gram > 0) {
+    var goldVal = typeof getGoldPrice === 'function' ? s.assets.gold_gram * getGoldPrice(s.player.year) : 0;
+    extras.push('금' + s.assets.gold_gram + 'g(' + Math.floor(goldVal/10000) + '만원)');
+  }
   if (s.assets.stocks && s.assets.stocks.length > 0) {
     var st = s.assets.stocks[0];
-    var curIdx = typeof getIndex === 'function' ? getIndex(st.name === '\uCF54\uC2A4\uB2E5' ? KOSDAQ : KOSPI, s.player.year, s.player.month) : 100;
+    var curIdx = typeof getIndex === 'function' ? getIndex(st.name === '코스닥' ? KOSDAQ : KOSPI, s.player.year, s.player.month) : 100;
     var stockVal = st.quantity * curIdx * 100;
-    cashText += ' +' + st.name + '(' + Math.floor(stockVal/10000) + '\uB9CC\uC6D0)';
+    extras.push(st.name + '(' + Math.floor(stockVal/10000) + '만원)');
   }
+  if (s.assets.real_estate && s.assets.real_estate.length > 0) {
+    extras.push('부동산(' + Math.floor(s.assets.real_estate[0].value/10000) + '만원)');
+  }
+  if (s.assets.buildings && (Array.isArray(s.assets.buildings) ? s.assets.buildings.length > 0 : s.assets.buildings.value)) {
+    var bv = Array.isArray(s.assets.buildings) ? s.assets.buildings[0].value : s.assets.buildings.value;
+    extras.push('건물(' + Math.floor(bv/10000) + '만원)');
+  }
+  // 부채 표시
+  var totalDebt = 0;
+  if (s.assets.debt && s.assets.debt.length > 0) {
+    for (var di = 0; di < s.assets.debt.length; di++) totalDebt += s.assets.debt[di].amount || 0;
+  }
+  if (s.stats && s.stats.card_debt > 0) totalDebt += s.stats.card_debt;
+  if (totalDebt > 0) extras.push('빚-' + Math.floor(totalDebt/10000) + '만원');
+
+  if (extras.length > 0) cashText += '\n' + extras.join(' ');
+
   sCash.textContent = cashText;
   sChapter.textContent = s.story.current_chapter + t('chapterUnit');
 }
