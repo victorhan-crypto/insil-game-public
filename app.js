@@ -453,6 +453,27 @@ function goToNextChapter() {
       console.log('이자 차감: -' + Math.floor(debtInterest/10000) + '만원 (' + debts[dbi].source + ')');
     }
 
+    // 대학생이면 매년 3월에 등록금 자동 차감 (반액 장학금 기준 180만원)
+    // 1999~2002년 사이면 대학생으로 간주
+    var playerAge = nextCh.year - 1979;
+    var isCollegeAge = (playerAge >= 20 && playerAge <= 23);
+    var isStudent = gameState.get().stats.job === 'student_college' || isCollegeAge;
+    if (isStudent && isCollegeAge) {
+      // 대학생 상태 자동 설정
+      if (gameState.get().stats.job !== 'student_college' && gameState.get().stats.job !== 'banker' && gameState.get().stats.job !== 'business' && gameState.get().stats.job !== 'securities') {
+        gameState.get().stats.job = 'student_college';
+      }
+    }
+    if (isStudent && nextCh.month_start <= 3 && isCollegeAge) {
+      var tuition = 1800000;
+      if (gameState.get().assets.cash_krw >= tuition) {
+        gameState.get().assets.cash_krw -= tuition;
+        console.log('등록금 자동 차감: -180만원 (' + nextCh.year + '년)');
+      } else {
+        console.log('등록금 부족 — 현금: ' + Math.floor(gameState.get().assets.cash_krw/10000) + '만원');
+      }
+    }
+
     // 챕터 전환 후 자산 평가액 (새 시점 환율/금값 적용)
     var newTotal = calcTotalAssets(gameState.get(), nextCh.year, nextCh.month_start);
     var diff = newTotal - prevTotal;

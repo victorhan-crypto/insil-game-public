@@ -145,7 +145,12 @@ function parseAction(text, state) {
   // ═══ 3. 주식 거래 ═══
   if (t.includes('주식') || t.includes('코스피') || t.includes('코스닥') ||
       t.includes('삼성') || t.includes('포항') || t.includes('현대') || t.includes('sk') || t.includes('lg') ||
-      t.includes('종목') || t.includes('증시')) {
+      t.includes('종목') || t.includes('증시') || t.includes('바이오') || t.includes('반도체') ||
+      t.includes('it') || t.includes('인터넷') || t.includes('닷컴') || t.includes('벤처') ||
+      t.includes('새롬') || t.includes('골드뱅크') || t.includes('다음') || t.includes('네이버') ||
+      t.includes('카카오') || t.includes('셀트리온') || t.includes('한미약품') || t.includes('제약') ||
+      t.includes('조선') || t.includes('철강') || t.includes('은행주') || t.includes('금융주') ||
+      t.includes('etf') || t.includes('상장')) {
     if (SELL) return { type: 'SELL_STOCK', amount };
     if (BUY) return { type: 'BUY_STOCK', amount };
   }
