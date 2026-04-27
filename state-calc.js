@@ -299,7 +299,12 @@ function parseAction(text, state) {
     return { type: 'INFO', amount: 0 };
   }
 
-  // ═══ 30. 아무것도 안 함 ═══
+  // ═══ 30. 투자 단독 입력 (대상 미지정 → 주식으로 기본 처리) ═══
+  if (/투자|넣겠|넣을|넣어|굴리|굴려|불리|불려|돈을 넣|돈 넣/.test(t) && !isNegative) {
+    return { type: 'BUY_STOCK', amount };
+  }
+
+  // ═══ 31. 아무것도 안 함 ═══
   if (/아무것도|넘어|잔다|기다|가만|지켜|관망|패스|스킵|넘기/.test(t)) {
     return { type: 'NONE', amount: 0 };
   }
