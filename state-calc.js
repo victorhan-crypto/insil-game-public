@@ -339,13 +339,9 @@ function calculateStateLocal(action, state, year, month) {
 
   switch (parsed.type) {
     case 'BUY_USD': {
-      const amt = parsed.amount || 0;
-      if (amt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      if (amt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = `현금 ${Math.floor(cash/10000)}만원으로 ${Math.floor(amt/10000)}만원을 환전할 수 없습니다.`;
-        break;
-      }
+      var amt = parsed.amount || Math.floor(cash * 0.5);
+      if (amt <= 0 || cash <= 0) { result.action_valid = false; result.rejection_reason = '환전할 현금이 없습니다.'; break; }
+      if (amt > cash) amt = cash;
       const rate = getExchangeRate(year, month);
       const usd = Math.floor(amt / rate);
       result.state_changes.assets = { cash_krw: -amt, usd: usd, usd_buy_rate: rate };
@@ -369,12 +365,13 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_GOLD': {
-      const amt = parsed.amount || 0;
-      if (amt <= 0 || amt > cash) {
+      var amt = parsed.amount || Math.floor(cash * 0.5);
+      if (amt <= 0 || cash <= 0) {
         result.action_valid = false;
-        result.rejection_reason = amt <= 0 ? '금액을 지정해주세요' : '현금이 부족합니다.';
+        result.rejection_reason = amt <= 0 ? '투자할 현금이 없습니다.' : '현금이 부족합니다.';
         break;
       }
+      if (amt > cash) amt = cash;
       const goldPrice = getGoldPrice(year);
       const goldGrams = Math.floor(amt / goldPrice);
       var goldRemaining = cash - amt;
@@ -454,13 +451,9 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'DEPOSIT': {
-      var depAmt = parsed.amount || 0;
-      if (depAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      if (depAmt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다.';
-        break;
-      }
+      var depAmt = parsed.amount || Math.floor(cash * 0.5);
+      if (depAmt <= 0 || cash <= 0) { result.action_valid = false; result.rejection_reason = '예금할 현금이 없습니다.'; break; }
+      if (depAmt > cash) depAmt = cash;
       var depRate = DEPOSIT_RATES[year] || 5;
       var annualInterest = Math.floor(depAmt * depRate / 100);
       result.state_changes.assets = { cash_krw: -depAmt + annualInterest };
@@ -623,13 +616,9 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_FUND': {
-      var fundAmt = parsed.amount || 0;
-      if (fundAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      if (fundAmt > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다.';
-        break;
-      }
+      var fundAmt = parsed.amount || Math.floor(cash * 0.5);
+      if (fundAmt <= 0 || cash <= 0) { result.action_valid = false; result.rejection_reason = '투자할 현금이 없습니다.'; break; }
+      if (fundAmt > cash) fundAmt = cash;
       var isChinaFund = action.includes('중국');
       var fundName = isChinaFund ? '중국펀드' : '국내펀드';
       // 펀드 수익률: 시기에 따라 다름
@@ -933,14 +922,25 @@ function calculateStateLocal(action, state, year, month) {
     }
     case 'BUY_STOCK': {
       var stockAmt = parsed.amount || 0;
-      if (stockAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      if (stockAmt > cash) {
+      // 금액 미지정 시 현금의 50% 자동 투자
+      if (stockAmt <= 0) {
+        stockAmt = Math.floor(cash * 0.5);
+        if (stockAmt < 100000) stockAmt = cash; // 10만원 미만이면 전액
+      }
+      if (stockAmt <= 0 || cash <= 0) {
         result.action_valid = false;
-        result.rejection_reason = '현금이 부족합니다. (보유: ' + Math.floor(cash/10000) + '만원)';
+        result.rejection_reason = '투자할 현금이 없습니다.';
         break;
       }
-      // 코스닥인지 코스피인지 판별
-      var isKosdaq = action.includes('코스닥') || action.includes('벤처') || action.includes('새롬') || action.includes('골드뱅크') || action.includes('다음');
+      if (stockAmt > cash) {
+        stockAmt = cash; // 보유 현금 초과 시 전액 투자
+      }
+      // 코스닥인지 코스피인지 판별 — 시대별 자동 선택
+      var isKosdaq = action.includes('코스닥') || action.includes('벤처') || action.includes('새롬') || action.includes('골드뱅크') || action.includes('다음') || action.includes('IT');
+      // 1999~2000년에 종목 미지정이면 코스닥 (시대 분위기)
+      if (!action.includes('코스피') && !action.includes('코스닥') && !isKosdaq) {
+        if (year >= 1999 && year <= 2000) isKosdaq = true;
+      }
       var indexData = isKosdaq ? KOSDAQ : KOSPI;
       var indexName = isKosdaq ? '코스닥' : '코스피';
       var currentIndex = getIndex(indexData, year, month);
@@ -955,7 +955,7 @@ function calculateStateLocal(action, state, year, month) {
       var stockRemaining = cash - actualCost;
       result.asset_summary = Math.floor(actualCost/10000) + '만원 → ' + indexName + ' ' + units + '주 (지수 ' + currentIndex + ') | 잔액 ' + Math.floor(stockRemaining/10000) + '만원';
       result.action_description = indexName + ' ' + units + '주 매수';
-      result.narrative_hints = { tone: 'tense', details: '증권사에 갔다. ' + indexName + '에 ' + Math.floor(actualCost/10000) + '만원을 넣었다. 지수 ' + currentIndex + '.' };
+      result.narrative_hints = { tone: 'tense', details: '증권사에 갔다. ' + indexName + '에 ' + Math.floor(actualCost/10000) + '만원을 넣었다. 지수 ' + currentIndex + '. ' + (isKosdaq ? '코스닥이 매일 오르고 있었다.' : '코스피에 넣었다. 안정적이었다.') };
       break;
     }
     case 'SELL_STOCK': {
