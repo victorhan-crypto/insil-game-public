@@ -90,7 +90,7 @@ function parseAction(text) {
   const t = text.toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ').trim();
 
   // 부정어 감지
-  var isNegative = /안 |안한|안해|안낸|안다|안사|안갈|안할|하지 않|하지않|포기|거절|싫|안 할|안 사|안 갈|필요없|관두|그만/.test(t);
+  var isNegative = /안 |안한|안해|안낸|안다|안사|안갈|안할|하지 않|하지않|포기|거절|싫|안 할|안 사|안 갈|필요없|관두|그만|말자|말아|말고|않겠|않을|안 낼|안낼/.test(t);
 
   // 금액 추출 (만원, 원)
   let amount = 0;
