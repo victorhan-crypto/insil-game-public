@@ -746,18 +746,9 @@ function calcTotalAssets(state, year, month) {
 }
 
 function dynamicSituation(text) {
-  var cash = gameState.get().assets.cash_krw;
-  var cashText = gameState.formatCash();
-  // "할머니가 준 200만원"은 고정 금액이므로 보호
-  // 먼저 보호할 패턴을 임시 치환
-  var protected1 = text.replace(/할머니가 준 200만원/g, '##GRANDMA##');
-  var protected2 = protected1.replace(/할머니가 대학 가면 쓰라고 준 200만원/g, '##GRANDMA2##');
-  // 나머지 200만원을 실제 자산으로 치환
-  var replaced = protected2.replace(/200만원/g, cashText);
-  // 보호된 패턴 복원
-  replaced = replaced.replace(/##GRANDMA##/g, '할머니가 준 200만원');
-  replaced = replaced.replace(/##GRANDMA2##/g, '할머니가 대학 가면 쓰라고 준 200만원');
-  return replaced;
+  // 원본 텍스트 그대로 반환 — Gemini가 정확한 자산 금액으로 서사를 생성하므로
+  // 클라이언트에서 금액을 치환하지 않음
+  return text;
 }
 
 function appendText(text, className) {
