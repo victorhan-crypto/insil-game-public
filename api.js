@@ -263,18 +263,25 @@ ${state.stats && state.stats.card_debt > 0 ? '카드 부채: ' + Math.floor(stat
 
 주의: 위 경제 상황의 숫자만 서사에 사용해라. 다른 금액을 지어내지 마라. 숫자를 나열하지 마라.
 할머니가 준 돈은 항상 200만원이다 (게임 시작 자산, 현재 잔고와 다름).
+"포항제철"이라는 단어를 절대 쓰지 마라. 주식을 언급할 때는 위 보유 종목명(코스피/코스닥)만 써라.
 
 ═══ 챕터 배경 ═══
 ${chapterSummary}
 
 ═══ 챕터 도입부 (문체 참고용) ═══
-${(chapterOpening || '').substring(0, 500)}
+${(() => {
+  var op = (chapterOpening || '').substring(0, 500);
+  // 포항제철을 플레이어 보유 종목으로 치환
+  var sn = (state.assets.stocks && state.assets.stocks.length > 0) ? state.assets.stocks[0].name : '주식';
+  op = op.replace(/포항제철/g, sn);
+  return op;
+})()}
 ${historyText}
 
 ═══ 현재 개입 상황 ═══
-${intervention.context}
+${(() => { var ctx = intervention.context || ''; var sn2 = (state.assets.stocks && state.assets.stocks.length > 0) ? state.assets.stocks[0].name : '주식'; return ctx.replace(/포항제철/g, sn2); })()}
 
-상황: ${intervention.situation}
+상황: ${(() => { var sit = intervention.situation || ''; var sn3 = (state.assets.stocks && state.assets.stocks.length > 0) ? state.assets.stocks[0].name : '주식'; return sit.replace(/포항제철/g, sn3); })()}
 
 ═══ 플레이어 행동 ═══
 "${playerAction}"
