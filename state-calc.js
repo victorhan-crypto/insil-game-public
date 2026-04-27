@@ -486,19 +486,27 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_REALESTATE': {
-      var reAmt = parsed.amount || 0;
-      if (reAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
+      // 시대별 기본 집값 (금액 미지정 시)
+      var defaultPrice = { 1999:50000000, 2000:60000000, 2001:70000000, 2002:80000000, 2003:100000000, 2004:120000000, 2005:150000000, 2006:200000000, 2007:250000000 };
+      var reAmt = parsed.amount || defaultPrice[year] || 100000000;
       if (state.player.age < 20) {
         result.action_valid = false;
         result.rejection_reason = '아직 부동산을 살 수 있는 나이가 아닙니다.';
         break;
       }
-      // 자기자본 30% + 대출 70% 구조
-      var downPayment = Math.floor(reAmt * 0.3);
+      // 대출 비율 — 플레이어가 대출을 언급하면 자기자본 10%, 아니면 30%
+      var mentionsLoan = /대출|담보|융자|빌려|빌린|레버리지/.test(action);
+      var downRatio = mentionsLoan ? 0.1 : 0.3;
+      var downPayment = Math.floor(reAmt * downRatio);
       if (downPayment > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '계약금이 부족합니다. (필요: ' + Math.floor(downPayment/10000) + '만원, 보유: ' + Math.floor(cash/10000) + '만원)';
-        break;
+        // 현금이 부족해도 최소 계약금(500만원)만 있으면 가능
+        if (cash >= 5000000) {
+          downPayment = cash;
+        } else {
+          result.action_valid = false;
+          result.rejection_reason = '계약금이 부족합니다. (최소 500만원 필요, 보유: ' + Math.floor(cash/10000) + '만원)';
+          break;
+        }
       }
       var mortgage = reAmt - downPayment;
       var mortgageRate = (DEPOSIT_RATES[year] || 5) + 2;
@@ -547,13 +555,16 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_BUILDING': {
-      var bldAmt = parsed.amount || 0;
-      if (bldAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
-      var bldDown = Math.floor(bldAmt * 0.3);
+      var bldAmt = parsed.amount || 300000000; // 기본 3억
+      var mentionsBldLoan = /대출|담보|융자|빌려|빌린/.test(action);
+      var bldDownRatio = mentionsBldLoan ? 0.1 : 0.3;
+      var bldDown = Math.floor(bldAmt * bldDownRatio);
       if (bldDown > cash) {
-        result.action_valid = false;
-        result.rejection_reason = '계약금이 부족합니다. (필요: ' + Math.floor(bldDown/10000) + '만원)';
-        break;
+        if (cash >= 5000000) { bldDown = cash; } else {
+          result.action_valid = false;
+          result.rejection_reason = '계약금이 부족합니다. (필요: ' + Math.floor(bldDown/10000) + '만원)';
+          break;
+        }
       }
       var bldLoan = bldAmt - bldDown;
       var bldRate = (DEPOSIT_RATES[year] || 5) + 2;
@@ -601,8 +612,7 @@ function calculateStateLocal(action, state, year, month) {
       break;
     }
     case 'BUY_BUSINESS': {
-      var bizAmt = parsed.amount || 0;
-      if (bizAmt <= 0) { result.action_description = '금액을 지정해주세요'; break; }
+      var bizAmt = parsed.amount || 50000000; // 기본 5000만원
       if (bizAmt > cash) {
         result.action_valid = false;
         result.rejection_reason = '현금이 부족합니다. (보유: ' + Math.floor(cash/10000) + '만원)';
